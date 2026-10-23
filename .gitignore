@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+
+# Server data dir (conf, params, secrets, builds, sessions)
+.data/
+
+# Live reload (make dev)
+.air/
+
+# Go
+*.test
+*.out
+/api/api
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Packaged config bundles
+bundle.json
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

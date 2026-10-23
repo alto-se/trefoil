@@ -1,0 +1,27 @@
+name: "Go"
+
+layers:
+  - title: "Install Go"
+    description: "Official Go toolchain from go.dev, linked into /usr/local/bin, plus gcc for cgo and -race"
+    script: |
+      apt-get update
+      apt-get install -y --no-install-recommends ca-certificates curl gcc libc6-dev
+      rm -rf /var/lib/apt/lists/*
+      curl -fsSL "https://go.dev/dl/go1.25.3.linux-$(dpkg --print-architecture).tar.gz" | tar -C /usr/local -xz
+      ln -s /usr/local/go/bin/go /usr/local/go/bin/gofmt /usr/local/bin/
+      go version
+
+tools:
+  - name: RunGo
+    description: "Writes a Go main package to a file and runs it with go run, returning the exit code and output"
+    input_schema:
+      type: object
+      properties:
+        path: { type: string, description: "File path to write the program to, e.g. /workspace/out/main.go" }
+        code: { type: string, description: "Full Go source of a main package (standard library only)" }
+      required: [path, code]
+    command:
+      language: python
+      code:
+        content: !Ref file://tools.py
+        entry: RunGo

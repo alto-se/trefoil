@@ -1,0 +1,30 @@
+# A skill fetched from GitHub at build time: the brick lists a GitHub archive
+# zip as the skill's source, and the build runs `harness/skills.py fetch` on
+# it. The shallowest SKILL.md in the zip marks the skill folder, so a repo
+# with SKILL.md at its root works as is (archives nest everything under
+# `<repo>-<ref>/`). Pin a tag or commit (`archive/<sha>.zip`) rather than a
+# branch so rebuilds get the same skill.
+#
+# The humanizer skill is from https://github.com/blader/humanizer (MIT).
+agents:
+  - name: humanizer
+    bricks:
+      - humanizer
+    prompts:
+      - source: !Ref file://prompt.md
+        role: system
+
+bricks:
+  humanizer:
+    skills:
+      - source: https://github.com/blader/humanizer/archive/refs/tags/v3.1.0.zip
+
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 4000
+  limits:
+    max_turns: 4
+    timeout_seconds: 120
+    max_cost_usd: 0.20

@@ -1,0 +1,25 @@
+agents:
+  - name: pdf
+    bricks:
+      - core:chromium
+      - core:trefoil
+    input_schema:
+      type: object
+      properties:
+        url: { type: string }
+        goal: { type: string }
+        filename: { type: string }
+      required: [url, goal, filename]
+    prompts:
+      - source: !Ref file://prompt.md
+        role: system
+
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 4000
+  limits:
+    max_turns: 8
+    timeout_seconds: 300
+    max_cost_usd: 0.30

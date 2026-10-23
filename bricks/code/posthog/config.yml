@@ -1,0 +1,5 @@
+mcps:
+  - secrets:
+       posthog: asd
+  urls: https:
+

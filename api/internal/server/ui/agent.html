@@ -1,0 +1,66 @@
+<div class="run">
+  <header class="run-head">
+    <a href="#agents" class="muted">← Agents</a>
+    <h2>{{.Name}}</h2>
+    <a href="/agents/{{.Name}}/context" download>Download build context</a>
+  </header>
+  {{if .Error}}<div class="error">{{.Error}}</div>
+  {{else}}
+  <dl>
+    <dt>Model</dt><dd>{{if .Model}}<code>{{.Model}}</code>{{else}}<span class="muted">default</span>{{end}}{{with .Provider}} <span class="muted">via {{.}}</span>{{end}}</dd>
+    <dt>Bricks</dt><dd>{{range $i, $b := .Bricks}}{{if $i}}, {{end}}<code>{{$b}}</code>{{else}}<span class="muted">none</span>{{end}}</dd>
+    {{with .Limits}}<dt>Limits</dt><dd>{{if .MaxTurns}}{{.MaxTurns}} turns · {{end}}{{if .TokenBudget}}{{.TokenBudget}} tokens · {{end}}{{if .MaxCostUSD}}${{.MaxCostUSD}} · {{end}}{{if .TimeoutSeconds}}{{.TimeoutSeconds}}s timeout{{end}}</dd>{{end}}
+  </dl>
+  <div class="run-grid">
+    <section>
+      <h2>Prompts</h2>
+      {{range .Prompts}}
+      <div class="prompt">
+        <h3>{{or .Role "system"}}</h3>
+        <pre>{{.Source}}</pre>
+      </div>
+      {{else}}<div class="empty">No prompts.</div>{{end}}
+      {{if .Skills}}<div class="empty">The harness adds a Skills section to the system prompt listing the skills below.</div>{{end}}
+    </section>
+    <div class="run-side">
+      <section>
+        <h2>Tools</h2>
+        {{if or .Tools .MCPs}}
+        <ol class="timeline">
+          {{range $i, $t := .Tools}}
+          <li class="ev ev-tool">
+            <span class="dot"></span>
+            <div class="ev-main">
+              <div class="ev-line"><strong><code>{{$t.Name}}</code></strong><span class="muted">{{$t.Kind}}</span>{{with $t.Brick}}<span class="ev-at mono muted">{{.}}</span>{{end}}</div>
+              {{with $t.Description}}<div class="ev-summary">{{.}}</div>{{end}}
+              {{with $t.Schema}}<details><summary class="muted">Input schema</summary><pre>{{.}}</pre></details>{{end}}
+            </div>
+          </li>
+          {{end}}
+          {{range .MCPs}}
+          <li class="ev ev-tool">
+            <span class="dot"></span>
+            <div class="ev-main">
+              <div class="ev-line"><strong><code>{{.Name}}</code></strong><span class="muted">mcp</span></div>
+              <div class="ev-summary mono">{{.URL}} · tools are listed by the server when a run starts</div>
+            </div>
+          </li>
+          {{end}}
+        </ol>
+        {{else}}<div class="empty">No tools.</div>{{end}}
+      </section>
+      {{if .Skills}}
+      <section>
+        <h2>Skills</h2>
+        <table>
+          <tr><th>Skill</th><th>Brick</th><th>Description</th></tr>
+          {{range .Skills}}
+          <tr><td><code>{{or .Name .Source}}</code></td><td class="muted">{{.Brick}}</td><td>{{or .Description "—"}}</td></tr>
+          {{end}}
+        </table>
+      </section>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</div>

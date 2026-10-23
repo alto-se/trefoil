@@ -1,0 +1,13 @@
+<div class="detail" {{if or (eq .Status "running") (eq .Status "queued")}}hx-get="/ui/jobs/{{.ID}}" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>
+  <h3>Build {{.Agent}} <span class="pill {{.Status}}">{{.Status}}</span></h3>
+  <dl>
+    <dt>Job</dt><dd class="mono">{{.ID}}</dd>
+    <dt>Image</dt><dd class="mono">{{.Image}}</dd>
+    {{if .ContextDir}}<dt>Context</dt><dd class="mono">{{.ContextDir}}</dd>{{end}}
+    <dt>Started</dt><dd>{{ago .CreatedAt}} · took {{dur .CreatedAt .FinishedAt}}</dd>
+    {{if .Error}}<dt>Error</dt><dd class="failed">{{.Error}}</dd>{{end}}
+  </dl>
+  <h3>Logs</h3>
+  <pre>{{or .Logs "(no output yet)"}}</pre>
+  <details><summary class="muted">Dockerfile</summary><pre>{{.Dockerfile}}</pre></details>
+</div>

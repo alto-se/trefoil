@@ -1,0 +1,12 @@
+secrets:
+  google_api_key: string
+
+cost: 
+  currency: dollar
+  value: 0.0001
+
+tools:
+  - name: "Tools"
+    description: ""
+    input: 
+      term: string

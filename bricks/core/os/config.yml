@@ -1,0 +1,41 @@
+tools:
+  - name: Read
+    description: "Reads the contents of a file"
+    input_schema:
+      type: object
+      properties:
+        path: { type: string, description: "File path to read" }
+      required: [path]
+    command:
+      language: python
+      code: 
+        content: !Ref file://tools.py
+        entry: Read
+
+  - name: Write
+    description: "Writes content to a file"
+    input_schema:
+      type: object
+      properties:
+        path: { type: string, description: "File path to write" }
+        content: { type: string, description: "Full file contents" }
+      required: [path, content]
+    command:
+      language: python
+      code: 
+        content: !Ref file://tools.py
+        entry: Write
+
+  - name: Bash
+    description: "Runs a shell command"
+    input_schema:
+      type: object
+      properties:
+        command: { type: string, description: "Shell command to run" }
+      required: [command]
+    command:
+      language: python
+      code: 
+        content: !Ref file://tools.py
+        entry: Bash
+

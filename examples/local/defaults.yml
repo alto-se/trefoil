@@ -1,0 +1,8 @@
+provider: bedrock
+aws_region: eu-west-1
+model: "claude-sonnet-4-6"
+max_tokens: 4000
+limits:
+  max_turns: 8
+  timeout_seconds: 180
+  max_cost_usd: 0.30

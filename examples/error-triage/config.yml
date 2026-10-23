@@ -1,0 +1,29 @@
+# Debugs an issue in an AWS account from its error logs: CloudWatch Logs
+# (Logs Insights queries), CloudTrail errors, alarms and service events,
+# through the AWS MCP Server (cloud:aws). Read-only: it reports a diagnosis
+# and suggested fix, it never changes resources.
+agents:
+  - name: error-triage
+    bricks:
+      - cloud:aws
+    input_schema:
+      type: object
+      properties:
+        issue: { type: string, description: "What is going wrong: symptoms, error messages, when it started" }
+        resource: { type: string, description: "Affected resource if known: Lambda function, ECS service, log group, API, ARN..." }
+        region: { type: string, description: "AWS region to look in", default: "eu-west-1" }
+        since_hours: { type: integer, description: "How far back to search the logs, in hours", default: 24, minimum: 1, maximum: 336 }
+      required: [issue]
+    prompts:
+      - source: !Ref file://prompt.md
+        role: system
+    limits:
+      max_turns: 40
+      timeout_seconds: 900
+      max_cost_usd: 2.00
+
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 8000

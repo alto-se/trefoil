@@ -1,0 +1,31 @@
+# Office documents agent: writes reports and letters (.odt/.docx/.pdf),
+# spreadsheets (.ods/.xlsx) and slide decks (.odp/.pptx) with the
+# docs:opendoc brick and its skills, and saves them as run artifacts.
+agents:
+  - name: opendoc
+    bricks:
+      - core:os
+      - core:trefoil
+      - docs:opendoc
+    input_schema:
+      type: object
+      properties:
+        task: { type: string, description: "The document to make, and what goes in it" }
+        formats:
+          type: array
+          items: { type: string, enum: [odt, docx, pdf, ods, xlsx, odp, pptx] }
+          description: "File formats to deliver (default: the OpenDocument format plus pdf)"
+      required: [task]
+    prompts:
+      - source: !Ref file://prompt.md
+        role: system
+    limits:
+      max_turns: 30
+      timeout_seconds: 900
+      max_cost_usd: 1.50
+
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 8000

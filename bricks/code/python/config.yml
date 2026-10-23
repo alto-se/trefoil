@@ -1,0 +1,25 @@
+name: "Python"
+
+layers:
+  - title: "Create Python venv"
+    description: "A virtualenv at /opt/venv for agent code, kept apart from the harness's packages, with pip upgraded"
+    script: |
+      python -m venv /opt/venv
+      /opt/venv/bin/pip install --no-cache-dir --upgrade pip
+      /opt/venv/bin/python --version
+
+tools:
+  - name: RunPython
+    description: "Writes a Python script to a file and runs it in the agent's virtualenv (/opt/venv), optionally pip installing packages first, returning the exit code and output"
+    input_schema:
+      type: object
+      properties:
+        path: { type: string, description: "File path to write the script to, e.g. /workspace/out/main.py" }
+        code: { type: string, description: "Full Python source of the script" }
+        packages: { type: array, items: { type: string }, description: "pip requirements to install into the venv before running, e.g. [\"requests\", \"numpy<3\"]" }
+      required: [path, code]
+    command:
+      language: python
+      code:
+        content: !Ref file://tools.py
+        entry: RunPython

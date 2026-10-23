@@ -1,0 +1,13 @@
+# AWS access for an agent through the AWS MCP Server (managed by AWS): AWS
+# API calls, AWS documentation search and agent SOPs. Requests are signed
+# with SigV4 using the AWS credentials the server passes into the container
+# (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN), so the agent
+# can do whatever those credentials allow: scope them with IAM.
+mcps:
+  - name: aws
+    # Also in Frankfurt: https://aws-mcp.eu-central-1.api.aws/mcp
+    # (sigv4 region eu-central-1). AWS calls can target any region.
+    url: https://aws-mcp.us-east-1.api.aws/mcp
+    sigv4:
+      service: aws-mcp
+      region: us-east-1

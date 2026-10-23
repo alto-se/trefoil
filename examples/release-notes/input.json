@@ -1,0 +1,11 @@
+{
+  "product": "Trefoil",
+  "version": "0.4.0",
+  "changes": [
+    "feat(harness): Skill tool loads SKILL.md from /trefoil/skills",
+    "fix(cli): sessions logs -f no longer drops the last line",
+    "perf(api): build contexts reuse cached layers",
+    "feat(bricks): shared bricks pick up skills/<name>/ folders"
+  ],
+  "filename": "release-notes/0.4.0.md"
+}

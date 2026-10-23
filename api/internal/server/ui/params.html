@@ -1,0 +1,31 @@
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+{{if .Saved}}<div class="saved">Saved params.</div>{{end}}
+{{if .Fields}}
+<div class="detail">
+  <p class="muted">Config-wide values. A run that leaves out an input field named after a param gets its value; run forms start with it. Blank fields fall back to the config's default.</p>
+  <form hx-post="/ui/params" hx-target="#params" hx-disabled-elt="find button">
+    <div class="fields">
+      {{range .Fields}}{{template "field" .}}{{end}}
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</div>
+<table>
+  <tr><th>Param</th><th>Used by</th><th>Value</th></tr>
+  {{range .Rows}}
+  <tr>
+    <td><code>{{.Name}}</code>{{if .Required}} <span class="muted">required</span>{{end}}</td>
+    <td>{{range $i, $a := .Agents}}{{if $i}}, {{end}}{{$a}}{{else}}<span class="muted">no agent</span>{{end}}</td>
+    <td>
+      {{if eq .Source "set"}}<span class="pill built">set</span>
+      {{else if eq .Source "default"}}<span class="pill built" title="The config's default">default</span>
+      {{else if .Required}}<span class="pill failed">missing</span>
+      {{else}}<span class="pill notbuilt">not set</span>{{end}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{else if not .Error}}<div class="empty">The stored config declares no params.</div>
+{{end}}

@@ -1,0 +1,24 @@
+agents:
+  - name: github
+    bricks:
+      - code:github
+      - core:os
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string }
+        question: { type: string }
+      required: [repo, question]
+    prompts:
+      - source: !Ref file://prompt.md
+        role: system
+
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 4000
+  limits:
+    max_turns: 15
+    timeout_seconds: 300
+    max_cost_usd: 0.50

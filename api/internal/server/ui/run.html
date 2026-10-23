@@ -1,0 +1,19 @@
+<div class="detail">
+  <h3>Run {{.Agent}}</h3>
+  {{if .Error}}<p class="failed">{{.Error}}</p>{{end}}
+  <form hx-post="/ui/agents/{{.Agent}}/run" hx-target="#detail" hx-disabled-elt="find button"
+        hx-trigger="submit, keydown[(metaKey||ctrlKey)&&key=='Enter']">
+    {{if .Fields}}
+    <div class="fields">
+      {{range .Fields}}{{template "field" .}}{{end}}
+    </div>
+    {{else}}
+    <p class="muted">Task for the agent, sent as-is on stdin.</p>
+    <textarea name="input" rows="4" autofocus placeholder="What should {{.Agent}} do?">{{.Input}}</textarea>
+    {{end}}
+    <div class="actions">
+      <button type="submit" class="primary">Run</button>
+      <span class="muted">⌘/Ctrl + Enter</span>
+    </div>
+  </form>
+</div>

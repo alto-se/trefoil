@@ -1,0 +1,15 @@
+[project]
+name = "trefoil"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["pyyaml>=6"]
+
+[project.scripts]
+trefoil = "package:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["package"]

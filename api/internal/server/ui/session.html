@@ -1,0 +1,69 @@
+<div class="run" id="run-{{.ID}}" {{if eq .Status "running"}}hx-get="/ui/sessions/{{.ID}}" hx-trigger="every 2s [this.offsetParent !== null]" hx-swap="outerHTML"{{end}}>
+  <header class="run-head">
+    <a href="#runs" class="muted">← Runs</a>
+    <h2>{{.Agent}} <span class="pill {{.Status}}">{{.Status}}</span></h2>
+    <span class="muted">started {{ago .CreatedAt}} · {{if eq .Status "running"}}running for{{else}}took{{end}} {{dur .CreatedAt .FinishedAt}}</span>
+  </header>
+  <dl>
+    <dt>Session</dt><dd class="mono">{{.ID}}</dd>
+    {{if .ExitCode}}<dt>Exit code</dt><dd>{{.ExitCode}}{{if .TimedOut}} (timed out){{end}}</dd>{{end}}
+    {{if .Error}}<dt>Error</dt><dd class="failed">{{.Error}}</dd>{{end}}
+  </dl>
+  <div class="run-grid">
+    <section>
+      <h2>Timeline</h2>
+      <ol class="timeline">
+        {{range $i, $e := .Timeline}}
+        <li class="ev ev-{{$e.Kind}} {{$e.Status}}">
+          <span class="dot"></span>
+          <div class="ev-main">
+            <div class="ev-line">
+              <strong>{{$e.Title}}</strong>
+              {{if $e.Took}}<span class="muted">{{$e.Took}}</span>{{end}}
+              {{if eq $e.Status "running"}}<span class="pill running">running</span>{{else if and (eq $e.Kind "tool") (eq $e.Status "failed")}}<span class="pill failed">error</span>{{end}}
+              <span class="ev-at mono muted">{{$e.Offset}}</span>
+            </div>
+            {{if $e.Summary}}<div class="ev-summary {{if eq $e.Kind "tool"}}mono{{end}}">{{$e.Summary}}</div>{{end}}
+            {{if or $e.Input $e.Output}}
+            <details id="ev-{{$i}}-{{$e.Kind}}">
+              <summary class="muted">{{if eq $e.Kind "tool"}}input &amp; output{{else}}details{{end}}</summary>
+              {{if $e.Input}}<pre>{{$e.Input}}</pre>{{end}}
+              {{if $e.Output}}<pre>{{$e.Output}}</pre>{{end}}
+            </details>
+            {{end}}
+          </div>
+        </li>
+        {{end}}
+        {{if eq .Status "running"}}<li class="ev pending"><span class="dot"></span><div class="ev-main muted">waiting for the next event…</div></li>{{end}}
+      </ol>
+    </section>
+    <div class="run-side">
+      {{if .Budgets}}<section>
+        <h2>Budget</h2>
+        <dl class="budgets">
+          {{range .Budgets}}
+          <dt>{{.Name}}</dt>
+          <dd>
+            {{if .Limit}}<span class="bar {{.Level}}"><span style="width: {{printf "%.1f" .Pct}}%"></span></span>{{end}}
+            <span class="mono">{{.Used}}{{if .Limit}} <span class="muted">/ {{.Limit}}</span>{{end}}</span>
+          </dd>
+          {{end}}
+        </dl>
+      </section>{{end}}
+      {{if .Result}}<section>
+        <h2>Output</h2>
+        <pre class="flush">{{or .Result.Stdout "(empty)"}}</pre>
+      </section>{{end}}
+      {{if .Artifacts}}<section>
+        <h2>Artifacts</h2>
+        <ul class="artifacts">
+          {{range .Artifacts}}<li><a href="/agents/{{$.Agent}}/sessions/{{$.ID}}/artifacts/{{.Path}}" target="_blank" rel="noopener" class="mono">{{.Path}}</a> <span class="muted">{{.Size}} bytes</span></li>{{end}}
+        </ul>
+      </section>{{end}}
+    </div>
+  </div>
+  <section class="run-logs">
+    <h2 class="with-action">Logs <a href="/agents/{{.Agent}}/sessions/{{.ID}}/logs?download=1" download>Download</a></h2>
+    <pre class="flush logs">{{or .Logs "(no output yet)"}}</pre>
+  </section>
+</div>

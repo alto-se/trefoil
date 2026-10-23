@@ -1,0 +1,23 @@
+{{if .Error}}<div class="error">{{.Error}}</div>
+{{else if not .Agents}}<div class="empty">No agents in the stored config.</div>
+{{else}}
+<table>
+  <tr><th>Name</th><th>Model</th><th>Provider</th><th>Bricks</th><th>Input</th><th>Prompts</th><th>Image</th><th></th></tr>
+  {{range .Agents}}
+  <tr>
+    <td><a class="agent" href="#agents/{{.Name}}" title="Prompts and tools"><strong>{{.Name}}</strong></a></td>
+    <td>{{if .Model}}<code>{{.Model}}</code>{{else}}<span class="muted">default</span>{{end}}</td>
+    <td>{{or .Provider "—"}}</td>
+    <td>{{range $i, $b := .Bricks}}{{if $i}}, {{end}}<code>{{$b}}</code>{{end}}</td>
+    <td>{{with .InputSchema}}{{range $i, $p := .Props}}{{if $i}}, {{end}}<code{{with $p.Description}} title="{{.}}"{{end}}>{{$p.Name}}: {{$p.Type}}</code>{{end}}{{else}}<span class="muted">task</span>{{end}}</td>
+    <td>{{.Prompts}}</td>
+    <td>{{if .Built}}<span class="pill built">built</span>{{else}}<span class="pill notbuilt">not built</span>{{end}} <code class="muted">{{.Image}}</code>
+      {{if .MissingSecrets}}<div class="failed">needs secret {{range $i, $n := .MissingSecrets}}{{if $i}}, {{end}}<code>{{$n}}</code>{{end}}</div>{{end}}</td>
+    <td class="actions">
+      <button hx-post="/agents/{{.Name}}/build" hx-swap="none" hx-on::after-request="htmx.trigger('#jobs', 'refresh')">Build</button>
+      <button hx-get="/ui/agents/{{.Name}}/run" hx-target="#detail" {{if not .Built}}disabled title="Build the agent first"{{else if .MissingSecrets}}disabled title="Set the missing secrets first"{{end}}>Run</button>
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{end}}

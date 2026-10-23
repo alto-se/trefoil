@@ -1,0 +1,29 @@
+{{if not .Runs}}<div class="empty">No runs since the server started.</div>
+{{else}}
+{{with .Usage}}{{if .Runs}}
+<div class="usage">
+  <div title="tokens per finished run, oldest first">
+    <span class="muted">tokens</span> <strong>{{printf "%.0f" .Tokens}}</strong>
+    <svg viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="{{.TokenLine}}"/></svg>
+  </div>
+  <div title="estimated cost per finished run, oldest first">
+    <span class="muted">cost</span> <strong>≈${{printf "%.4f" .Cost}}</strong>
+    <svg viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="{{.CostLine}}"/></svg>
+  </div>
+  <span class="muted">over {{.Runs}} finished run{{if ne .Runs 1}}s{{end}}</span>
+</div>
+{{end}}{{end}}
+<table>
+  <tr><th>Agent</th><th>Status</th><th>Usage</th><th>Started</th><th>Took</th></tr>
+  {{range .Runs}}
+  <tr class="click" onclick="location.hash = 'runs/{{.ID}}'">
+    <td><a href="#runs/{{.ID}}">{{.Agent}}</a> <span class="muted mono">{{.ID}}</span></td>
+    <td><span class="pill {{.Status}}">{{.Status}}</span>{{if .ExitCode}} <span class="muted">exit {{.ExitCode}}</span>{{end}}</td>
+    <td class="run-usage" title="tokens per model turn">{{if .Turns}}<svg viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="{{.Line}}"/></svg>{{end}}
+      {{- if or .Turns .Finished}}<span class="muted">{{printf "%.0f" .Tokens}} tok{{if .Finished}} · ≈${{printf "%.4f" .Cost}}{{end}}</span>{{end}}</td>
+    <td class="muted">{{ago .CreatedAt}}</td>
+    <td class="muted">{{dur .CreatedAt .FinishedAt}}</td>
+  </tr>
+  {{end}}
+</table>
+{{end}}

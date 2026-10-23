@@ -1,0 +1,101 @@
+# A team of maintenance agents for one GitHub repository. The repo is a
+# param, declared like an input_schema: set its value once on the server
+# (dashboard Params page, or `trefoil params set --name=repo owner/name`) and
+# every agent's `repo` input defaults to it. A run can still pass its own
+# {"repo": "owner/name"} to point at another one.
+#
+# All agents share the GitHub brick, so the server needs a github_token
+# secret (trefoil secrets set --name=github_token). The GitHub MCP server is
+# read-only: agents never push, they save their changes as run artifacts.
+
+params:
+  type: object
+  properties:
+    repo: { type: string, description: "GitHub repository, owner/name" }
+  required: [repo]
+
+agents:
+  # Clones the repo, works out how to run its tests and runs them.
+  - name: tests
+    bricks:
+      - code:go
+      - code:node
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string }
+        ref: { type: string }
+      required: [repo]
+    prompts:
+      - source: !Ref file://prompts/common.md
+      - source: !Ref file://prompts/tests.md
+    limits:
+      max_turns: 25
+      timeout_seconds: 900
+      max_cost_usd: 2.00
+
+  # Drafts release notes from the pull requests merged since a tag.
+  - name: release-notes
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string }
+        since: { type: string }
+        version: { type: string }
+      required: [repo]
+    prompts:
+      - source: !Ref file://prompts/common.md
+      - source: !Ref file://prompts/release-notes.md
+
+  # Brings the LICENSE file up to date and saves the new file and a diff.
+  - name: license
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string }
+        holder: { type: string }
+        year: { type: integer }
+      required: [repo]
+    prompts:
+      - source: !Ref file://prompts/common.md
+      - source: !Ref file://prompts/license.md
+
+  # Reads the open issues and suggests labels, priority and duplicates.
+  - name: triage
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string }
+        limit: { type: integer }
+      required: [repo]
+    prompts:
+      - source: !Ref file://prompts/common.md
+      - source: !Ref file://prompts/triage.md
+
+  # Lists the dependencies that are pinned, outdated or unmaintained.
+  - name: deps-audit
+    bricks:
+      - code:go
+      - code:node
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string }
+      required: [repo]
+    prompts:
+      - source: !Ref file://prompts/common.md
+      - source: !Ref file://prompts/deps-audit.md
+
+defaults:
+  bricks:
+    - code:github
+    - core:os
+    - core:trefoil
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 8000
+  limits:
+    max_turns: 20
+    timeout_seconds: 600
+    max_cost_usd: 1.50

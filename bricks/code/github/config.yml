@@ -1,0 +1,37 @@
+# GitHub access for an agent: the GitHub MCP server plus a tool to clone
+# repositories. The token comes from TREFOIL_SECRET_GITHUB_TOKEN on the
+# server and reaches the container as GITHUB_TOKEN.
+secrets:
+  github_token:
+    required: true
+
+layers:
+  - title: "Install git"
+    script: |
+      apt-get update
+      apt-get install -y --no-install-recommends git ca-certificates
+      rm -rf /var/lib/apt/lists/*
+
+mcps:
+  - name: github
+    url: https://api.githubcopilot.com/mcp/
+    # Sent as HTTP headers; ${NAME} is read from the container's environment.
+    credentials:
+      Authorization: "Bearer ${GITHUB_TOKEN}"
+      X-MCP-Toolsets: "repos,issues,pull_requests"
+      X-MCP-Readonly: "true"
+
+tools:
+  - name: CloneRepo
+    description: "Clones a GitHub repository (shallow) into /workspace/repos/<owner>/<repo> and returns the path"
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string, description: "Repository as owner/name" }
+        ref: { type: string, description: "Branch or tag to check out; default branch if omitted" }
+      required: [repo]
+    command:
+      language: python
+      code:
+        content: !Ref file://tools.py
+        entry: CloneRepo

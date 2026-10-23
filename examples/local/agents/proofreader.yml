@@ -1,0 +1,16 @@
+# One agent per file. Refs resolve against this file's folder, so the prompt
+# sits next to it.
+name: proofreader
+bricks:
+  - core:os    # shared: Read, Write, Bash
+  - proofing   # local, in its own folder (bricks/proofing/)
+  - clock      # local, defined inline in config.yml
+input_schema:
+  type: object
+  properties:
+    text: { type: string, description: "Text to proofread" }
+    filename: { type: string, default: "report.md" }
+  required: [text]
+prompts:
+  - source: !Ref file://proofreader.md
+    role: system

@@ -1,0 +1,32 @@
+{{/* One input property as a form control; see inputField. */}}
+{{define "field"}}
+<label for="{{.ID}}">{{.Name}} <code class="muted">{{.Type}}</code>{{if .Param}} <span class="muted" title="Starts with the config param's value">param</span>{{end}}{{if .Description}}<br><small class="muted">{{.Description}}</small>{{end}}</label>
+<div>
+  {{if eq .Kind "text"}}
+  <input id="{{.ID}}" name="field.{{.Name}}" type="text" value="{{.Value}}" {{if not .Optional}}required{{end}} {{if .Autofocus}}autofocus{{end}}>
+  {{else if eq .Kind "integer"}}
+  <input id="{{.ID}}" name="field.{{.Name}}" type="number" step="1" value="{{.Value}}" {{with .Min}}min="{{.}}"{{end}} {{with .Max}}max="{{.}}"{{end}} {{if not .Optional}}required{{end}} {{if .Autofocus}}autofocus{{end}}>
+  {{else if eq .Kind "number"}}
+  <input id="{{.ID}}" name="field.{{.Name}}" type="number" step="any" value="{{.Value}}" {{with .Min}}min="{{.}}"{{end}} {{with .Max}}max="{{.}}"{{end}} {{if not .Optional}}required{{end}} {{if .Autofocus}}autofocus{{end}}>
+  {{else if eq .Kind "checkbox"}}
+  <input id="{{.ID}}" name="field.{{.Name}}" type="checkbox" value="true" {{if eq .Value "true"}}checked{{end}}>
+  {{else if eq .Kind "select"}}
+  <select id="{{.ID}}" name="field.{{.Name}}" {{if not .Optional}}required{{end}} {{if .Autofocus}}autofocus{{end}}>
+    <option value="">{{if .Optional}}— not set —{{else}}— choose —{{end}}</option>
+    {{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Value}}</option>
+    {{end}}
+  </select>
+  {{else if eq .Kind "choices"}}
+  <div class="choices">
+    {{$name := .Name}}{{range .Options}}<label><input type="checkbox" name="field.{{$name}}" value="{{.Value}}" {{if .Selected}}checked{{end}}> {{.Value}}</label>
+    {{end}}
+  </div>
+  {{else if eq .Kind "lines"}}
+  <textarea id="{{.ID}}" name="field.{{.Name}}" rows="3" {{if .Autofocus}}autofocus{{end}}>{{.Value}}</textarea>
+  <small class="muted">One item per line.</small>
+  {{else}}
+  <textarea id="{{.ID}}" name="field.{{.Name}}" rows="4" class="mono" spellcheck="false" {{if not .Optional}}required{{end}} {{if .Autofocus}}autofocus{{end}}>{{.Value}}</textarea>
+  <small class="muted">JSON.</small>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Trefoil config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "bricks": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/brick" }
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+          "limits": { "$ref": "#/$defs/limits" },
+          "bricks": { "type": "array", "items": { "type": "string" } },
+          "input_schema": {
+            "description": "JSON Schema for the run's input, written like a tool's input_schema.",
+            "type": "object",
+            "required": ["type"],
+            "properties": { "type": { "const": "object" }, "properties": { "type": "object" } }
+          },
+          "outputs": { "$ref": "#/$defs/fields" },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["source"],
+              "properties": {
+                "source": { "type": "string" },
+                "role": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "storage": { "type": "string" },
+        "secrets": { "type": "string" }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bricks": { "type": "array", "items": { "type": "string" } },
+        "model": { "type": "string" },
+        "provider": { "enum": ["anthropic", "bedrock"] },
+        "aws_region": { "type": "string" },
+        "base_image": { "type": "string" },
+        "limits": { "$ref": "#/$defs/limits" },
+        "max_tokens": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "params": {
+      "description": "Config-wide values, written like an input_schema. Values are set on the server (falling back to each property's default); a run that leaves out an input field named after a param gets the param's value.",
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "const": "object" }, "properties": { "type": "object" } }
+    }
+  },
+  "$defs": {
+    "fields": {
+      "description": "Named, typed values: a list of {name: type} maps, or one map. Types: string, number, integer, boolean, object, array; suffix [] for a list, ? for optional.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": { "type": "string" } }
+        },
+        { "type": "object", "additionalProperties": { "type": "string" } }
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_turns": { "type": "integer", "minimum": 1 },
+        "token_budget": { "type": "integer", "minimum": 1 },
+        "timeout_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "max_cost_usd": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "brick": {
+      "type": "object",
+      "properties": {
+        "source": { "type": "string" },
+        "compatibility": { "type": "string" },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["source"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+              "source": {
+                "description": "URL of a zip with the skill folder, a zip packaged as a data:application/zip;base64, URL, or the folder itself as {relative path: contents}",
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "object", "additionalProperties": { "type": "string" } }
+                ]
+              }
+            }
+          }
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title", "script"],
+            "properties": {
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "script": { "type": "string" }
+            }
+          }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "command"],
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "input_schema": { "type": "object" },
+              "command": {
+                "type": "object",
+                "required": ["language", "code"],
+                "properties": {
+                  "language": { "type": "string" },
+                  "code": {
+                    "oneOf": [
+                      { "type": "string" },
+                      {
+                        "type": "object",
+                        "required": ["content"],
+                        "additionalProperties": false,
+                        "properties": { "content": { "type": "string" }, "entry": { "type": "string" } }
+                      }
+                    ]
+                  },
+                  "entry": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "server_tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "enum": ["web_search", "web_fetch"] },
+              "type": { "type": "string" },
+              "max_uses": { "type": "integer", "minimum": 1 },
+              "allowed_domains": { "type": "array", "items": { "type": "string" } },
+              "blocked_domains": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "additionalProperties": {
+            "type": "object",
+            "properties": { "required": { "type": "boolean" } }
+          }
+        },
+        "mcps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "credentials": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              },
+              "sigv4": {
+                "type": "object",
+                "required": ["service", "region"],
+                "properties": {
+                  "service": { "type": "string" },
+                  "region": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

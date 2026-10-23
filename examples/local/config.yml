@@ -1,0 +1,31 @@
+# Everything here is local to this config: bricks without a "<namespace>:"
+# prefix are defined under `bricks:` instead of loaded from the shared
+# bricks/ folder. Local and shared bricks mix freely in an agent's list.
+#
+# The config is split over several files with `!Ref file://...`: any value
+# can live in its own .yml (agents, a brick, defaults), and `trefoil config
+# package` inlines them into one bundle. Refs in a referenced file resolve
+# against that file's folder.
+agents:
+  - !Ref file://agents/proofreader.yml
+
+bricks:
+  # A brick in its own file, laid out just like a shared brick: a layer,
+  # tools in tools.py and a skill zip.
+  proofing: !Ref file://bricks/proofing/config.yml
+
+  # A brick written inline, tool code and all.
+  clock:
+    tools:
+      - name: Now
+        description: "Returns the current UTC date and time in ISO 8601"
+        input_schema: { type: object, properties: {} }
+        command:
+          language: python
+          code: |
+            from datetime import datetime, timezone
+
+            def Now(args):
+                return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+defaults: !Ref file://defaults.yml

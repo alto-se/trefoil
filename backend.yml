@@ -1,0 +1,14 @@
+env_file: .env
+
+aws: 
+  region: eu-west-1
+  
+llm_provider: 
+  - bedrock
+
+storage:
+  default: local
+  local:
+    path: ./.data
+
+server_port: 8080

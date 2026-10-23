@@ -1,0 +1,7 @@
+name: "Release notes"
+
+# A skill zip holds the skill folder (SKILL.md plus the files it uses); it's
+# packaged into the config as base64 and unpacked at build time. To edit it,
+# unzip, change and zip again: cd skills && zip -rX release-notes.zip release-notes
+skills:
+  - source: !Ref file://skills/release-notes.zip

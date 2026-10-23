@@ -1,0 +1,14 @@
+{{if not .}}<div class="empty">No build jobs since the server started.</div>
+{{else}}
+<table>
+  <tr><th>Agent</th><th>Status</th><th>Started</th><th>Took</th></tr>
+  {{range .}}
+  <tr class="click" hx-get="/ui/jobs/{{.ID}}" hx-target="#detail">
+    <td>{{.Agent}} <span class="muted mono">{{.ID}}</span></td>
+    <td><span class="pill {{.Status}}">{{.Status}}</span></td>
+    <td class="muted">{{ago .CreatedAt}}</td>
+    <td class="muted">{{dur .CreatedAt .FinishedAt}}</td>
+  </tr>
+  {{end}}
+</table>
+{{end}}

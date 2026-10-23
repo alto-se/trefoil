@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Syncs every example config to a running trefoil server and builds each of
+# its agents' images, then prints a summary and exits non-zero if any sync or
+# build failed. Runs nothing, so no model credentials or secrets are needed.
+#
+#   scripts/verify                     # all examples/*/config.yml
+#   scripts/verify examples/go ...     # just these (folders or config files)
+#
+# The server holds one config at a time, so syncing replaces it; the config
+# stored before the run is put back at the end. Server: $TREFOIL_SERVER or
+# http://localhost:8080 (start it with `make dev`). Build logs go to
+# $VERIFY_LOGS (default: a temp dir) as <example>-<agent>.log.
+set -uo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+server="${TREFOIL_SERVER:-http://localhost:8080}"
+logs="${VERIFY_LOGS:-$(mktemp -d -t trefoil-verify)}"
+mkdir -p "$logs"
+
+configs=()
+if [ $# -eq 0 ]; then
+  for c in "$root"/examples/*/config.yml; do configs+=("$c"); done
+else
+  for a in "$@"; do
+    if [ -d "$a" ]; then configs+=("$a/config.yml"); else configs+=("$a"); fi
+  done
+fi
+
+if ! curl -fsS -o /dev/null "$server/agents"; then
+  echo "verify: cannot reach $server; is the server running? (make dev)" >&2
+  exit 2
+fi
+
+# Keep the stored config so it can be restored when we're done.
+saved="$(mktemp -t trefoil-conf)"
+if ! curl -fsS -o "$saved" "$server/conf"; then
+  rm -f "$saved"
+  saved=""
+fi
+restore() {
+  if [ -n "$saved" ]; then
+    if curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" --data-binary "@$saved" "$server/conf"; then
+      echo "verify: restored the server's previous config" >&2
+    else
+      echo "verify: failed to restore the server's previous config (saved in $saved)" >&2
+      return
+    fi
+    rm -f "$saved"
+  fi
+}
+trap restore EXIT
+
+passed=()
+failed=()
+for config in "${configs[@]}"; do
+  name="$(basename "$(dirname "$config")")"
+  echo "== $name" >&2
+  if ! agents="$(trefoil config package "$config" | python3 -c 'import json, sys; print("\n".join(a["name"] for a in json.load(sys.stdin).get("agents", [])))')"; then
+    failed+=("$name (package)")
+    continue
+  fi
+  if ! trefoil config sync "$config" --server "$server" >"$logs/$name-sync.log" 2>&1; then
+    echo "   sync failed: $(tail -n 1 "$logs/$name-sync.log")" >&2
+    failed+=("$name (sync)")
+    continue
+  fi
+  for agent in $agents; do
+    log="$logs/$name-$agent.log"
+    start=$SECONDS
+    if trefoil agents build --agent="$agent" --server "$server" >"$log" 2>&1; then
+      echo "   ok    $agent ($((SECONDS - start))s)" >&2
+      passed+=("$name/$agent")
+    else
+      echo "   FAIL  $agent: $(tail -n 1 "$log")" >&2
+      failed+=("$name/$agent")
+    fi
+  done
+done
+
+echo >&2
+echo "verify: ${#passed[@]} built, ${#failed[@]} failed (logs in $logs)" >&2
+for f in ${failed[@]+"${failed[@]}"}; do echo "  failed: $f" >&2; done
+[ ${#failed[@]} -eq 0 ]

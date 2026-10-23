@@ -1,0 +1,23 @@
+agents:
+  - name: node
+    bricks:
+      - code:node
+    input_schema:
+      type: object
+      properties:
+        task: { type: string }
+        filename: { type: string }
+      required: [task, filename]
+    prompts:
+      - source: !Ref file://prompt.md
+        role: system
+
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 4000
+  limits:
+    max_turns: 5
+    timeout_seconds: 180
+    max_cost_usd: 0.20

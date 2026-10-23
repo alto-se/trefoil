@@ -1,0 +1,20 @@
+# Live reload for `make dev`: rebuilds and restarts the API when its code,
+# embedded assets (harness, Dockerfile template, schema, UI templates) or backend settings
+# change. Shared bricks are read per build, so they need no restart.
+root = "."
+tmp_dir = ".air"
+
+[build]
+  cmd = "cd api && go build -o ../.air/api ./cmd/api"
+  bin = ".air/api"
+  include_dir = ["api"]
+  include_ext = ["go", "py", "json", "tmpl", "html"]
+  include_file = ["backend.yml", ".env"]
+  exclude_regex = ["_test\\.go$"]
+  delay = 500
+  # SIGINT so the server shuts down gracefully before the restart.
+  send_interrupt = true
+  kill_delay = "2s"
+
+[misc]
+  clean_on_exit = true

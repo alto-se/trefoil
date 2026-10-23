@@ -1,0 +1,12 @@
+# The pre-commit hook runs `gitleaks detect --no-git`, which scans the whole
+# working tree, ignored files included. Local secrets live in gitignored
+# files (.env, the server data dir), so skip those paths.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "gitignored local secrets"
+paths = [
+  '''(^|/)\.env(\..*)?$''',
+  '''(^|/)\.data/''',
+]
