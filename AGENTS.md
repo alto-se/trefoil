@@ -10,6 +10,14 @@ Notes for coding agents working in this repo.
 - `examples/` — sample configs, e.g. `examples/echo/`.
 - `backend.yml` — server settings used by `make dev`.
 
+## Building agents and bricks
+
+Read `bricks/code/trefoil/skills/trefoil-agents/SKILL.md` before writing an
+agent or brick (Claude Code loads it through the `.claude/skills/` symlink;
+trefoil agents get it from the `code:trefoil` brick): prefer shared bricks (`core:os`, `code:github`, ...) over new tools,
+keep bricks generic (a capability, not one agent's part), put programs in their own brick instead of heredocs in a layer script, and
+lay configs out as `trefoil/agents/<name>/` and `trefoil/bricks/<name>/`.
+
 ## Common tasks
 
 ```sh
