@@ -212,7 +212,7 @@ type record struct {
 	ID         string        `json:"id"`
 	Agent      string        `json:"agent"`
 	Limits     conf.Limits   `json:"limits,omitzero"`
-	Input      []byte        `json:"input,omitempty"`
+	Input      *[]byte       `json:"input,omitempty"` // a pointer so an empty input is kept, not dropped
 	Status     Status        `json:"status"`
 	Result     *storedResult `json:"result,omitempty"`
 	Error      string        `json:"error,omitempty"`
@@ -232,8 +232,11 @@ func (s *Session) save() {
 	if s.dir == "" {
 		return
 	}
-	rec := record{ID: s.id, Agent: s.agent, Limits: s.limits, Input: s.input, Status: s.status, Error: s.err,
+	rec := record{ID: s.id, Agent: s.agent, Limits: s.limits, Status: s.status, Error: s.err,
 		CreatedAt: s.createdAt, FinishedAt: s.finishedAt}
+	if s.input != nil {
+		rec.Input = &s.input
+	}
 	if s.result != nil {
 		rec.Result = &storedResult{*s.result, s.result.Structured}
 	}
@@ -272,8 +275,11 @@ func Open(dir string) (*Manager, error) {
 		if err := json.Unmarshal(data, &r); err != nil || r.ID == "" {
 			continue // skip files we can't make sense of rather than refuse to start
 		}
-		s := &Session{id: r.ID, agent: r.Agent, limits: r.Limits, input: r.Input, status: r.Status, err: r.Error,
+		s := &Session{id: r.ID, agent: r.Agent, limits: r.Limits, status: r.Status, err: r.Error,
 			createdAt: r.CreatedAt, finishedAt: r.FinishedAt, dir: dir}
+		if r.Input != nil {
+			s.input = append([]byte{}, *r.Input...) // non-nil even when empty
+		}
 		if r.Result != nil {
 			res := r.Result.Result
 			res.Structured = r.Result.Structured
@@ -301,6 +307,9 @@ func Open(dir string) (*Manager, error) {
 // error means the run couldn't happen at all. limits are kept with the
 // session so its budgets can be shown, and input so it can be rerun.
 func (m *Manager) Start(agent string, limits conf.Limits, input []byte, fn func(ctx context.Context, s *Session) (*Result, error)) *Session {
+	if input == nil {
+		input = []byte{} // nil means "saved before inputs were kept"
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{id: newID(), agent: agent, limits: limits, input: input, status: Running, createdAt: time.Now(), dir: m.dir, cancel: cancel}
 	if m.dir != "" {

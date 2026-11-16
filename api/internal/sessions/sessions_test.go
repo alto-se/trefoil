@@ -127,6 +127,32 @@ func TestOpenPersists(t *testing.T) {
 	}
 }
 
+// An empty input (a run with no task) still counts as stored, so the
+// session can be rerun after a reload.
+func TestOpenKeepsEmptyInput(t *testing.T) {
+	dir := t.TempDir()
+	m, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := m.Start("echo", conf.Limits{}, nil, func(_ context.Context, s *Session) (*Result, error) {
+		return &Result{}, nil
+	})
+	wait(t, s)
+
+	m2, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := m2.Get(s.ID())
+	if !ok {
+		t.Fatal("session not reloaded")
+	}
+	if in := got.Input(); in == nil || len(in) != 0 {
+		t.Errorf("input = %#v, want empty and non-nil", in)
+	}
+}
+
 func TestOpenMarksRunningFailed(t *testing.T) {
 	dir := t.TempDir()
 	m, err := Open(dir)
