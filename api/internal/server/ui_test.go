@@ -45,6 +45,17 @@ func TestUI(t *testing.T) {
 	if rec := do(h, http.MethodGet, "/ui/jobs/"+job["id"].(string), ""); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "pill succeeded") {
 		t.Errorf("job detail: status = %d\n%s", rec.Code, rec.Body)
 	}
+	if rec := do(h, http.MethodGet, "/ui/jobs/"+job["id"].(string), ""); !strings.Contains(rec.Body.String(), `hx-post="/ui/jobs/`+job["id"].(string)+`/rerun"`) {
+		t.Errorf("job detail missing rerun button:\n%s", rec.Body)
+	}
+	rec = do(h, http.MethodPost, "/ui/jobs/"+job["id"].(string)+"/rerun", "")
+	if rec.Code != http.StatusOK || rec.Header().Get("HX-Retarget") != "#detail" || !strings.Contains(rec.Body.String(), "Build echo") ||
+		strings.Contains(rec.Body.String(), `/ui/jobs/`+job["id"].(string)+`"`) {
+		t.Errorf("rerun job: status = %d, headers = %v, body = %s", rec.Code, rec.Header(), rec.Body)
+	}
+	if rec := do(h, http.MethodPost, "/ui/jobs/missing/rerun", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("rerun missing job: status = %d, want 404", rec.Code)
+	}
 
 	rec = do(h, http.MethodPost, "/agents/echo/run", "hi")
 	var run map[string]any

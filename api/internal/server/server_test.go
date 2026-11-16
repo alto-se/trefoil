@@ -440,6 +440,37 @@ func TestListJobs(t *testing.T) {
 	}
 }
 
+func TestRerunJob(t *testing.T) {
+	h, _ := newTestHandlerWithDocker(t)
+	if rec := do(h, http.MethodPost, "/conf", `{"modules":{},"agents":[{"name":"a"}]}`); rec.Code != http.StatusCreated {
+		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	first := buildAndWait(t, h, "/agents/a/build")
+	if rec := do(h, http.MethodPost, "/jobs/missing/rerun", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("rerun missing job: status = %d, want 404", rec.Code)
+	}
+
+	// A rerun builds the agent again from the config as it is now.
+	if rec := do(h, http.MethodPost, "/conf", `{"modules":{"os":{}},"defaults":{"modules":["os"]},"agents":[{"name":"a"}]}`); rec.Code != http.StatusCreated {
+		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	second := buildAndWait(t, h, "/jobs/"+first["id"].(string)+"/rerun")
+	if second["id"] == first["id"] || second["agent"] != "a" || second["status"] != "succeeded" {
+		t.Fatalf("rerun job = %v", second)
+	}
+	if second["dockerfile"] == first["dockerfile"] {
+		t.Errorf("rerun didn't use the current config")
+	}
+
+	// It fails once the agent is gone from the config.
+	if rec := do(h, http.MethodPost, "/conf", `{"modules":{},"agents":[{"name":"b"}]}`); rec.Code != http.StatusCreated {
+		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := do(h, http.MethodPost, "/jobs/"+first["id"].(string)+"/rerun", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("rerun removed agent: status = %d, want 404", rec.Code)
+	}
+}
+
 func TestPostConfWritesBuildContexts(t *testing.T) {
 	v, err := schema.NewConf()
 	if err != nil {
