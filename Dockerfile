@@ -9,7 +9,7 @@
 #     ghcr.io/alto-se/trefoil-api
 #
 # Mount a backend.yml and set TREFOIL_SETTINGS to configure it further;
-# ADDR, DATA_DIR and BRICKS_DIR still override it.
+# ADDR, DATA_DIR and MODULES_DIR still override it.
 
 FROM golang:1.24-alpine AS build
 WORKDIR /src
@@ -20,10 +20,10 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
 FROM docker:27-cli
 COPY --from=build /out/api /usr/local/bin/trefoil-api
-COPY bricks/ /trefoil/bricks/
+COPY modules/ /trefoil/modules/
 ENV ADDR=:8080 \
     DATA_DIR=/data \
-    BRICKS_DIR=/trefoil/bricks
+    MODULES_DIR=/trefoil/modules
 VOLUME /data
 EXPOSE 8080
 ENTRYPOINT ["trefoil-api"]

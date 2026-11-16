@@ -8,7 +8,7 @@
   {{else}}
   <dl>
     <dt>Model</dt><dd>{{if .Model}}<code>{{.Model}}</code>{{else}}<span class="muted">default</span>{{end}}{{with .Provider}} <span class="muted">via {{.}}</span>{{end}}</dd>
-    <dt>Bricks</dt><dd>{{range $i, $b := .Bricks}}{{if $i}}, {{end}}<code>{{$b}}</code>{{else}}<span class="muted">none</span>{{end}}</dd>
+    <dt>Modules</dt><dd>{{range $i, $b := .Modules}}{{if $i}}, {{end}}<code>{{$b}}</code>{{else}}<span class="muted">none</span>{{end}}</dd>
     {{with .Limits}}<dt>Limits</dt><dd>{{if .MaxTurns}}{{.MaxTurns}} turns · {{end}}{{if .TokenBudget}}{{.TokenBudget}} tokens · {{end}}{{if .MaxCostUSD}}${{.MaxCostUSD}} · {{end}}{{if .TimeoutSeconds}}{{.TimeoutSeconds}}s timeout{{end}}</dd>{{end}}
   </dl>
   <div class="run-grid">
@@ -31,7 +31,7 @@
           <li class="ev ev-tool">
             <span class="dot"></span>
             <div class="ev-main">
-              <div class="ev-line"><strong><code>{{$t.Name}}</code></strong><span class="muted">{{$t.Kind}}</span>{{with $t.Brick}}<span class="ev-at mono muted">{{.}}</span>{{end}}</div>
+              <div class="ev-line"><strong><code>{{$t.Name}}</code></strong><span class="muted">{{$t.Kind}}</span>{{with $t.Module}}<span class="ev-at mono muted">{{.}}</span>{{end}}</div>
               {{with $t.Description}}<div class="ev-summary">{{.}}</div>{{end}}
               {{with $t.Schema}}<details><summary class="muted">Input schema</summary><pre>{{.}}</pre></details>{{end}}
             </div>
@@ -53,9 +53,9 @@
       <section>
         <h2>Skills</h2>
         <table>
-          <tr><th>Skill</th><th>Brick</th><th>Description</th></tr>
+          <tr><th>Skill</th><th>Module</th><th>Description</th></tr>
           {{range .Skills}}
-          <tr><td><code>{{or .Name .Source}}</code></td><td class="muted">{{.Brick}}</td><td>{{or .Description "—"}}</td></tr>
+          <tr><td><code>{{or .Name .Source}}</code></td><td class="muted">{{.Module}}</td><td>{{or .Description "—"}}</td></tr>
           {{end}}
         </table>
       </section>

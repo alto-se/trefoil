@@ -1,6 +1,6 @@
 agents:
   - name: postgres
-    bricks:
+    modules:
       - data:postgres
     input_schema:
       type: object
@@ -8,7 +8,7 @@ agents:
         question: { type: string, description: "Question to answer from the database" }
       required: [question]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:

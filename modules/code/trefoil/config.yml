@@ -1,0 +1,7 @@
+name: "Trefoil"
+
+# Know-how for agents that write trefoil configs: the trefoil-agents skill in
+# skills/trefoil-agents/ (picked up automatically) covers picking shared
+# modules over new tools, packaging code as modules and the trefoil/agents,
+# trefoil/modules layout. Claude Code in this repo loads the same folder
+# through the .claude/skills/trefoil-agents symlink.

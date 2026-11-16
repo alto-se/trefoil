@@ -4,9 +4,9 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "bricks": {
+    "modules": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/brick" }
+      "additionalProperties": { "$ref": "#/$defs/module" }
     },
     "agents": {
       "type": "array",
@@ -16,7 +16,7 @@
         "properties": {
           "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
           "limits": { "$ref": "#/$defs/limits" },
-          "bricks": { "type": "array", "items": { "type": "string" } },
+          "modules": { "type": "array", "items": { "type": "string" } },
           "input_schema": {
             "description": "JSON Schema for the run's input, written like a tool's input_schema.",
             "type": "object",
@@ -50,7 +50,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "bricks": { "type": "array", "items": { "type": "string" } },
+        "modules": { "type": "array", "items": { "type": "string" } },
         "model": { "type": "string" },
         "provider": { "enum": ["anthropic", "bedrock"] },
         "aws_region": { "type": "string" },
@@ -87,7 +87,7 @@
         "max_cost_usd": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
-    "brick": {
+    "module": {
       "type": "object",
       "properties": {
         "source": { "type": "string" },

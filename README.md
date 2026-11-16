@@ -11,14 +11,14 @@ session. Develop and test locally, then deploy the same config to the cloud.
 ```yaml
 agents:
   - name: writer
-    bricks: [core:os]            # Read, Write and Bash tools
+    modules: [core:os]            # Read, Write and Bash tools
     input_schema:
       type: object
       properties:
         topic: { type: string }
       required: [topic]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:
@@ -43,11 +43,11 @@ config-driven workflow:
 
 - **Declarative agents.** Prompts, input schema, model, provider and limits
   (turns, timeout, cost) live in a YAML config. Split it across files with
-  `!Ref`.
-- **Bricks.** Reusable building blocks of tools, scripts, image layers, skills,
-  secrets and MCP servers. Compose an agent from shared bricks
+  `!include`.
+- **Modules.** Reusable building blocks of tools, scripts, image layers, skills,
+  secrets and MCP servers. Compose an agent from shared modules
   (`core:os`, `code:github`, `docs:opendoc`, ...) or define local ones next to
-  your config. The name comes from *bricolage*, not bricks like a house.
+  your config. The name comes from *bricolage*, not modules like a house.
   Really funny joke I know. Took me several prompts to find a good word for it.
 - **Built-in harness.** Every agent image ships with the trefoil harness: the
   agent loop, tool dispatch, Agent Skills, MCP clients and a timeline of
@@ -63,9 +63,9 @@ config-driven workflow:
 
 | Concept    | What it is |
 |------------|------------|
-| **Config** | A YAML file with `agents`, `defaults`, local `bricks` and `params`. Synced to the server with `trefoil config sync`. |
-| **Agent**  | A named agent: prompts, bricks, input schema, model and limits. Built into a Docker image. |
-| **Brick**  | Tools (Python code with a JSON input schema), image layers, skills, secrets and MCP servers that an agent pulls in. Shared bricks live in `bricks/<namespace>/<name>/`. |
+| **Config** | A YAML file with `agents`, `defaults`, local `modules` and `params`. Synced to the server with `trefoil config sync`. |
+| **Agent**  | A named agent: prompts, modules, input schema, model and limits. Built into a Docker image. |
+| **Module**  | Tools (Python code with a JSON input schema), image layers, skills, secrets and MCP servers that an agent pulls in. Shared modules live in `modules/<namespace>/<name>/`. |
 | **Skill**  | An Agent Skill folder (`SKILL.md` plus files) installed in the image and offered to the model through a `Skill` tool. |
 | **Session**| One run of an agent: status, logs, event timeline, result and artifacts. |
 | **Job**    | A background task on the server, such as an image build. |
@@ -109,9 +109,9 @@ trefoil params set  --name=repo owner/name
 trefoil jobs list
 ```
 
-## Bricks included
+## Modules included
 
-| Namespace | Bricks |
+| Namespace | Modules |
 |-----------|--------|
 | `core`    | `os` (Read/Write/Bash), `trefoil` (SaveArtifact), `chromium`, `websearch` |
 | `code`    | `github`, `go`, `java`, `node`, `python`, `posthog` |
@@ -120,13 +120,13 @@ trefoil jobs list
 | `docs`    | `opendoc` (office documents via LibreOffice), `release-notes` |
 | `style`   | `caveman` |
 
-Each shared brick can carry a `tests.py` that runs inside its real image:
-`make test-bricks BRICKS="core:os"`.
+Each shared module can carry a `tests.py` that runs inside its real image:
+`make test-modules MODULES="core:os"`.
 
 ## Examples
 
 `examples/` has a config per use case: `echo` (minimal), `writer` (file
-tools), `local` (local bricks and split configs), `github`, `aws`,
+tools), `local` (local modules and split configs), `github`, `aws`,
 `postgres`, `pdf` (browse and print with Chromium), `opendoc`,
 `release-notes`, `humanizer` (skill from a GitHub zip), `repo-ops` (params
 shared by several agents), `error-triage` and language toolchains (`go`,
@@ -139,7 +139,7 @@ shared by several agents), `error-triage` and language toolchains (`go`,
 ```
 api/        Go API server, dashboard and agent harness
 cli/        Python trefoil CLI
-bricks/     shared bricks
+modules/     shared modules
 examples/   sample configs
 backend.yml server settings for make dev
 ```
@@ -149,7 +149,7 @@ backend.yml server settings for make dev
 ```sh
 make dev           # API with live reload
 make test          # Go tests
-make test-bricks   # brick tests in their images
+make test-modules   # module tests in their images
 make verify        # build every example
 ```
 

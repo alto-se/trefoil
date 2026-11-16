@@ -1,6 +1,6 @@
 // Package settings loads the API server's own settings (backend.yml):
 // defaults, then the YAML file, then environment overrides (ADDR, DATA_DIR,
-// BRICKS_DIR).
+// MODULES_DIR).
 package settings
 
 import (
@@ -30,7 +30,7 @@ type Settings struct {
 	LLMProvider []string `yaml:"llm_provider"`
 	Storage     Storage  `yaml:"storage"`
 	ServerPort  int      `yaml:"server_port"`
-	BricksDir   string   `yaml:"bricks_dir"`
+	ModulesDir  string   `yaml:"modules_dir"`
 
 	// Addr is derived from ServerPort, or set by ADDR.
 	Addr string `yaml:"-"`
@@ -54,7 +54,7 @@ func Defaults() Settings {
 	return Settings{
 		Storage:    Storage{Default: "local", Local: LocalStorage{Path: "./data"}},
 		ServerPort: 8080,
-		BricksDir:  "./bricks",
+		ModulesDir: "./modules",
 	}
 }
 
@@ -73,7 +73,7 @@ func Load(path string) (Settings, error) {
 			return s, fmt.Errorf("%s: %w", path, err)
 		}
 		// Relative paths in the file are relative to the file, not the cwd.
-		for _, p := range []*string{&s.EnvFile, &s.Storage.Local.Path, &s.BricksDir} {
+		for _, p := range []*string{&s.EnvFile, &s.Storage.Local.Path, &s.ModulesDir} {
 			if *p != "" && !filepath.IsAbs(*p) {
 				*p = filepath.Join(filepath.Dir(path), *p)
 			}
@@ -89,7 +89,7 @@ func Load(path string) (Settings, error) {
 	}
 
 	s.Addr = ":" + strconv.Itoa(s.ServerPort)
-	for env, field := range map[string]*string{"ADDR": &s.Addr, "DATA_DIR": &s.Storage.Local.Path, "BRICKS_DIR": &s.BricksDir} {
+	for env, field := range map[string]*string{"ADDR": &s.Addr, "DATA_DIR": &s.Storage.Local.Path, "MODULES_DIR": &s.ModulesDir} {
 		if v := os.Getenv(env); v != "" {
 			*field = v
 		}

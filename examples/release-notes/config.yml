@@ -1,6 +1,6 @@
 agents:
   - name: release-notes
-    bricks:
+    modules:
       - core:os
       - docs:release-notes
     input_schema:
@@ -12,7 +12,7 @@ agents:
         filename: { type: string }
       required: [product, version, changes, filename]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:

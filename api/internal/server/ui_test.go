@@ -27,7 +27,7 @@ func TestUI(t *testing.T) {
 		t.Fatalf("agents before conf: %s", rec.Body)
 	}
 
-	conf := `{"bricks":{"os":{}},"defaults":{"bricks":["os"],"model":"claude-sonnet-5"},"agents":[{"name":"echo"}]}`
+	conf := `{"modules":{"os":{}},"defaults":{"modules":["os"],"model":"claude-sonnet-5"},"agents":[{"name":"echo"}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -77,7 +77,7 @@ func TestUI(t *testing.T) {
 
 func TestUIRun(t *testing.T) {
 	h, d := newTestHandlerWithDocker(t)
-	conf := `{"bricks":{"os":{}},"defaults":{"bricks":["os"]},"agents":[{"name":"echo"},` +
+	conf := `{"modules":{"os":{}},"defaults":{"modules":["os"]},"agents":[{"name":"echo"},` +
 		`{"name":"adder","input_schema":{"type":"object","properties":{` +
 		`"a":{"type":"integer"},"label":{"type":"string","description":"Shown on top"},"loud":{"type":"boolean"},` +
 		`"tags":{"type":"array","items":{"type":"string"}},"opts":{"type":"object"},` +
@@ -177,8 +177,8 @@ func TestUISecrets(t *testing.T) {
 		h.ServeHTTP(rec, req)
 		return rec
 	}
-	conf := `{"bricks":{"gh":{"secrets":{"github_token":{"required":true},"extra":{}}},"os":{}},` +
-		`"agents":[{"name":"a","bricks":["gh"]},{"name":"b","bricks":["os"]}]}`
+	conf := `{"modules":{"gh":{"secrets":{"github_token":{"required":true},"extra":{}}},"os":{}},` +
+		`"agents":[{"name":"a","modules":["gh"]},{"name":"b","modules":["os"]}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -215,7 +215,7 @@ func TestUISecrets(t *testing.T) {
 func TestUIParams(t *testing.T) {
 	h, _ := newTestHandlerWithDocker(t)
 	conf := `{"params":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"limit":{"type":"integer","default":5}},"required":["repo"]},` +
-		`"bricks":{"os":{}},"defaults":{"bricks":["os"]},` +
+		`"modules":{"os":{}},"defaults":{"modules":["os"]},` +
 		`"agents":[{"name":"a","input_schema":{"type":"object","properties":{"repo":{"type":"string"},"limit":{"type":"integer"}},"required":["repo"]}}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
@@ -255,25 +255,25 @@ func TestUIParams(t *testing.T) {
 	}
 }
 
-func TestUIBricks(t *testing.T) {
+func TestUIModules(t *testing.T) {
 	h, _ := newTestHandlerWithDocker(t)
-	if body := do(h, http.MethodGet, "/ui/bricks", "").Body.String(); !strings.Contains(body, "no config uploaded") {
-		t.Fatalf("bricks before conf: %s", body)
+	if body := do(h, http.MethodGet, "/ui/modules", "").Body.String(); !strings.Contains(body, "no config uploaded") {
+		t.Fatalf("modules before conf: %s", body)
 	}
-	conf := `{"bricks":{"gh":{"secrets":{"github_token":{"required":true}},"mcps":[{"name":"github","url":"https://mcp.example/"}]},` +
+	conf := `{"modules":{"gh":{"secrets":{"github_token":{"required":true}},"mcps":[{"name":"github","url":"https://mcp.example/"}]},` +
 		`"os":{"tools":[{"name":"Write","description":"Write a file","command":{"language":"python","code":"def Write(): pass"}}],"server_tools":[{"name":"web_search"}]},"idle":{}},` +
-		`"defaults":{"bricks":["os"]},"agents":[{"name":"a","bricks":["gh"]},{"name":"b"}]}`
+		`"defaults":{"modules":["os"]},"agents":[{"name":"a","modules":["gh"]},{"name":"b"}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
-	body := do(h, http.MethodGet, "/ui/bricks", "").Body.String()
+	body := do(h, http.MethodGet, "/ui/modules", "").Body.String()
 	for _, want := range []string{
 		"<code>os</code>", "used by a, b", "<code>Write</code>", "python", "Write a file",
 		"<code>web_search</code>", "<code>github</code>", "https://mcp.example/",
 		"<code>github_token</code> <span class=\"muted\">required</span>", "<code>idle</code>", "unused",
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("bricks fragment missing %q:\n%s", want, body)
+			t.Errorf("modules fragment missing %q:\n%s", want, body)
 		}
 	}
 }
@@ -287,7 +287,7 @@ func TestUITimeline(t *testing.T) {
 		`x-trefoil-event: tool_result {"turn":1,"id":"tu1","tool":"Write","is_error":true,"ms":42,"output":"Error: disk full","ts":4}` + "\n" +
 		`x-trefoil-event: tool_call {"turn":1,"id":"tu2","tool":"Bash","input":{"cmd":"ls"},"ts":5}` + "\n" +
 		`x-trefoil-event: done {"turns":2,"tokens":15,"cost_usd":0.0012,"ts":6}` + "\n"
-	if rec := do(h, http.MethodPost, "/conf", `{"bricks":{"os":{}},"defaults":{"bricks":["os"]},"agents":[{"name":"echo"}]}`); rec.Code != http.StatusCreated {
+	if rec := do(h, http.MethodPost, "/conf", `{"modules":{"os":{}},"defaults":{"modules":["os"]},"agents":[{"name":"echo"}]}`); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
 	buildAndWait(t, h, "/agents/echo/build")
@@ -412,10 +412,10 @@ func TestBudgets(t *testing.T) {
 
 func TestUIAgent(t *testing.T) {
 	h, _ := newTestHandlerWithDocker(t)
-	conf := `{"bricks":{"os":{"tools":[{"name":"Write","description":"Write a file","input_schema":{"type":"object","properties":{"path":{"type":"string"}}},"command":{"language":"python","code":"def Write(): pass"}}],` +
+	conf := `{"modules":{"os":{"tools":[{"name":"Write","description":"Write a file","input_schema":{"type":"object","properties":{"path":{"type":"string"}}},"command":{"language":"python","code":"def Write(): pass"}}],` +
 		`"server_tools":[{"name":"web_search"}],"mcps":[{"name":"github","url":"https://mcp.example/"}],` +
 		`"skills":[{"source":{"SKILL.md":"---\nname: notes\ndescription: Write release notes\n---\nbody"}}]}},` +
-		`"defaults":{"bricks":["os"],"model":"claude-x"},"agents":[{"name":"echo","prompts":[{"source":"You echo <things>.","role":"system"},{"source":"Be brief.","role":"user"}]}]}`
+		`"defaults":{"modules":["os"],"model":"claude-x"},"agents":[{"name":"echo","prompts":[{"source":"You echo <things>.","role":"system"},{"source":"Be brief.","role":"user"}]}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}

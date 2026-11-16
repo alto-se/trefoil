@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"trefoil/api/internal/bricks"
 	"trefoil/api/internal/build"
 	"trefoil/api/internal/conf"
 	"trefoil/api/internal/jobs"
+	"trefoil/api/internal/modules"
 	"trefoil/api/internal/schema"
 	"trefoil/api/internal/sessions"
 	"trefoil/api/internal/store"
@@ -35,7 +35,7 @@ type server struct {
 	jobs      *jobs.Manager
 	sessions  *sessions.Manager
 	buildDir  string
-	bricks    *bricks.Library
+	modules   *modules.Library
 	providers []string
 }
 
@@ -54,10 +54,10 @@ func WithManagers(j *jobs.Manager, sess *sessions.Manager) Option {
 }
 
 // New returns the root HTTP handler with all routes registered. Build
-// contexts are written to buildDir/<agent>/<job id>; shared bricks ("core:os") are
+// contexts are written to buildDir/<agent>/<job id>; shared modules ("core:os") are
 // read from lib.
-func New(logger *slog.Logger, st store.Store, v *schema.Validator, d build.Docker, buildDir string, lib *bricks.Library, opts ...Option) http.Handler {
-	s := &server{logger: logger, store: st, validator: v, docker: d, jobs: jobs.NewManager(), sessions: sessions.NewManager(), buildDir: buildDir, bricks: lib}
+func New(logger *slog.Logger, st store.Store, v *schema.Validator, d build.Docker, buildDir string, lib *modules.Library, opts ...Option) http.Handler {
+	s := &server{logger: logger, store: st, validator: v, docker: d, jobs: jobs.NewManager(), sessions: sessions.NewManager(), buildDir: buildDir, modules: lib}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -98,6 +98,7 @@ func (s *server) handlePostConf(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusRequestEntityTooLarge, "body too large")
 		return
 	}
+	body = conf.Upgrade(body)
 	if err := s.validator.Validate(body); err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -110,7 +111,7 @@ func (s *server) handlePostConf(w http.ResponseWriter, r *http.Request) {
 		err = s.applyProvider(c)
 	}
 	if err == nil {
-		err = s.attachSharedBricks(c)
+		err = s.attachSharedModules(c)
 	}
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
@@ -234,28 +235,28 @@ func (s *server) applyProvider(c *conf.Conf) error {
 	return nil
 }
 
-// attachSharedBricks loads every shared brick ("<namespace>:<name>") the
-// config uses into c.Bricks. The stored config keeps only the reference, so
+// attachSharedModules loads every shared module ("<namespace>:<name>") the
+// config uses into c.Modules. The stored config keeps only the reference, so
 // edits to the shared folder apply on the next build.
-func (s *server) attachSharedBricks(c *conf.Conf) error {
-	for _, name := range c.BrickRefs() {
-		if !bricks.IsShared(name) {
+func (s *server) attachSharedModules(c *conf.Conf) error {
+	for _, name := range c.ModuleRefs() {
+		if !modules.IsShared(name) {
 			continue
 		}
-		if _, local := c.Bricks[name]; local {
-			return fmt.Errorf("brick %q: shared brick names can't be defined locally", name)
+		if _, local := c.Modules[name]; local {
+			return fmt.Errorf("module %q: shared module names can't be defined locally", name)
 		}
-		raw, b, err := s.bricks.Load(name)
+		raw, b, err := s.modules.Load(name)
 		if err != nil {
 			return err
 		}
-		if err := s.validator.ValidateBrick(raw); err != nil {
-			return fmt.Errorf("shared brick %q: %w", name, err)
+		if err := s.validator.ValidateModule(raw); err != nil {
+			return fmt.Errorf("shared module %q: %w", name, err)
 		}
-		if c.Bricks == nil {
-			c.Bricks = map[string]conf.Brick{}
+		if c.Modules == nil {
+			c.Modules = map[string]conf.Module{}
 		}
-		c.Bricks[name] = *b
+		c.Modules[name] = *b
 	}
 	return nil
 }

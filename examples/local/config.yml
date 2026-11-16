@@ -1,20 +1,20 @@
-# Everything here is local to this config: bricks without a "<namespace>:"
-# prefix are defined under `bricks:` instead of loaded from the shared
-# bricks/ folder. Local and shared bricks mix freely in an agent's list.
+# Everything here is local to this config: modules without a "<namespace>:"
+# prefix are defined under `modules:` instead of loaded from the shared
+# modules/ folder. Local and shared modules mix freely in an agent's list.
 #
-# The config is split over several files with `!Ref file://...`: any value
-# can live in its own .yml (agents, a brick, defaults), and `trefoil config
+# The config is split over several files with `!include file://...`: any value
+# can live in its own .yml (agents, a module, defaults), and `trefoil config
 # package` inlines them into one bundle. Refs in a referenced file resolve
 # against that file's folder.
 agents:
-  - !Ref file://agents/proofreader.yml
+  - !include file://agents/proofreader.yml
 
-bricks:
-  # A brick in its own file, laid out just like a shared brick: a layer,
+modules:
+  # A module in its own file, laid out just like a shared module: a layer,
   # tools in tools.py and a skill zip.
-  proofing: !Ref file://bricks/proofing/config.yml
+  proofing: !include file://modules/proofing/config.yml
 
-  # A brick written inline, tool code and all.
+  # A module written inline, tool code and all.
   clock:
     tools:
       - name: Now
@@ -28,4 +28,4 @@ bricks:
             def Now(args):
                 return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-defaults: !Ref file://defaults.yml
+defaults: !include file://defaults.yml

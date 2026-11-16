@@ -1,4 +1,4 @@
-# A skill fetched from GitHub at build time: the brick lists a GitHub archive
+# A skill fetched from GitHub at build time: the module lists a GitHub archive
 # zip as the skill's source, and the build runs `harness/skills.py fetch` on
 # it. The shallowest SKILL.md in the zip marks the skill folder, so a repo
 # with SKILL.md at its root works as is (archives nest everything under
@@ -8,13 +8,13 @@
 # The humanizer skill is from https://github.com/blader/humanizer (MIT).
 agents:
   - name: humanizer
-    bricks:
+    modules:
       - humanizer
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
-bricks:
+modules:
   humanizer:
     skills:
       - source: https://github.com/blader/humanizer/archive/refs/tags/v3.1.0.zip

@@ -1,6 +1,6 @@
 # Live reload for `make dev`: rebuilds and restarts the API when its code,
 # embedded assets (harness, Dockerfile template, schema, UI templates) or backend settings
-# change. Shared bricks are read per build, so they need no restart.
+# change. Shared modules are read per build, so they need no restart.
 root = "."
 tmp_dir = ".air"
 

@@ -1,9 +1,9 @@
 agents:
   - name: caveman
-    bricks:
+    modules:
       - style:caveman
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:

@@ -4,7 +4,7 @@
 # every agent's `repo` input defaults to it. A run can still pass its own
 # {"repo": "owner/name"} to point at another one.
 #
-# All agents share the GitHub brick, so the server needs a github_token
+# All agents share the GitHub module, so the server needs a github_token
 # secret (trefoil secrets set --name=github_token). The GitHub MCP server is
 # read-only: agents never push, they save their changes as run artifacts.
 
@@ -17,7 +17,7 @@ params:
 agents:
   # Clones the repo, works out how to run its tests and runs them.
   - name: tests
-    bricks:
+    modules:
       - code:go
       - code:node
     input_schema:
@@ -27,8 +27,8 @@ agents:
         ref: { type: string }
       required: [repo]
     prompts:
-      - source: !Ref file://prompts/common.md
-      - source: !Ref file://prompts/tests.md
+      - source: !include file://prompts/common.md
+      - source: !include file://prompts/tests.md
     limits:
       max_turns: 25
       timeout_seconds: 900
@@ -44,8 +44,8 @@ agents:
         version: { type: string }
       required: [repo]
     prompts:
-      - source: !Ref file://prompts/common.md
-      - source: !Ref file://prompts/release-notes.md
+      - source: !include file://prompts/common.md
+      - source: !include file://prompts/release-notes.md
 
   # Brings the LICENSE file up to date and saves the new file and a diff.
   - name: license
@@ -57,8 +57,8 @@ agents:
         year: { type: integer }
       required: [repo]
     prompts:
-      - source: !Ref file://prompts/common.md
-      - source: !Ref file://prompts/license.md
+      - source: !include file://prompts/common.md
+      - source: !include file://prompts/license.md
 
   # Reads the open issues and suggests labels, priority and duplicates.
   - name: triage
@@ -69,12 +69,12 @@ agents:
         limit: { type: integer }
       required: [repo]
     prompts:
-      - source: !Ref file://prompts/common.md
-      - source: !Ref file://prompts/triage.md
+      - source: !include file://prompts/common.md
+      - source: !include file://prompts/triage.md
 
   # Lists the dependencies that are pinned, outdated or unmaintained.
   - name: deps-audit
-    bricks:
+    modules:
       - code:go
       - code:node
     input_schema:
@@ -83,11 +83,11 @@ agents:
         repo: { type: string }
       required: [repo]
     prompts:
-      - source: !Ref file://prompts/common.md
-      - source: !Ref file://prompts/deps-audit.md
+      - source: !include file://prompts/common.md
+      - source: !include file://prompts/deps-audit.md
 
 defaults:
-  bricks:
+  modules:
     - code:github
     - core:os
     - core:trefoil

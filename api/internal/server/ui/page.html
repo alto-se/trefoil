@@ -139,7 +139,7 @@
   .detail > p:first-child { margin-top: 0; }
   .detail h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
   .detail h3 + h3, .detail pre + h3 { margin-top: 16px; font-size: 14px; }
-  dl.meta, .detail dl, .run > dl, .brick dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+  dl.meta, .detail dl, .run > dl, .module dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; }
   .detail dl { margin-bottom: 4px; }
   dl dt { color: var(--muted); }
   dl dd { margin: 0; overflow-wrap: anywhere; }
@@ -148,18 +148,18 @@
   pre { margin: 0 0 12px; padding: 12px; max-height: 420px; overflow: auto; background: var(--sunk); border: 1px solid var(--line); border-radius: 7px; font: 12px/1.55 var(--mono); white-space: pre-wrap; word-break: break-word; }
   pre.flush { margin: 0; border: 0; border-radius: 0; max-height: 600px; }
 
-  /* Bricks */
-  .brick { border-bottom: 1px solid var(--line); }
-  .brick:last-child { border-bottom: 0; }
-  .brick h3 { margin: 0; padding: 14px 16px; font-size: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .brick h3 code { font-size: 13px; font-weight: 600; padding: 0; background: none; border: 0; }
-  .brick h3 .muted { font-weight: 400; font-size: 13px; }
-  .brick table { border-top: 1px solid var(--line); table-layout: fixed; }
-  .brick th { position: static; }
-  .brick th:nth-child(1) { width: 28%; }
-  .brick th:nth-child(2) { width: 12%; }
-  .brick td { overflow-wrap: anywhere; }
-  .brick dl { padding: 12px 16px; border-top: 1px solid var(--line); }
+  /* Modules */
+  .module { border-bottom: 1px solid var(--line); }
+  .module:last-child { border-bottom: 0; }
+  .module h3 { margin: 0; padding: 14px 16px; font-size: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .module h3 code { font-size: 13px; font-weight: 600; padding: 0; background: none; border: 0; }
+  .module h3 .muted { font-weight: 400; font-size: 13px; }
+  .module table { border-top: 1px solid var(--line); table-layout: fixed; }
+  .module th { position: static; }
+  .module th:nth-child(1) { width: 28%; }
+  .module th:nth-child(2) { width: 12%; }
+  .module td { overflow-wrap: anywhere; }
+  .module dl { padding: 12px 16px; border-top: 1px solid var(--line); }
 
   /* Agent and run pages */
   .run { display: flex; flex-direction: column; gap: 20px; }
@@ -235,7 +235,7 @@
     <a href="#runs">Runs</a>
     <a href="#params">Params</a>
     <a href="#secrets">Secrets</a>
-    <a href="#bricks">Bricks</a>
+    <a href="#modules">Modules</a>
   </nav>
   <small>Live, refreshes every 3s</small>
 </aside>
@@ -294,13 +294,13 @@
       <div id="secrets" hx-get="/ui/secrets" hx-trigger="load"></div>
     </section>
   </div>
-  <div data-view="bricks" hidden>
+  <div data-view="modules" hidden>
     <header class="page-head">
-      <h1>Bricks</h1>
-      <p>The tools, skills and secrets each brick adds to the agents that use it.</p>
+      <h1>Modules</h1>
+      <p>The tools, skills and secrets each module adds to the agents that use it.</p>
     </header>
     <section>
-      <div id="bricks" hx-get="/ui/bricks" hx-trigger="load, refresh from:body"></div>
+      <div id="modules" hx-get="/ui/modules" hx-trigger="load, refresh from:body"></div>
     </section>
   </div>
 </main>

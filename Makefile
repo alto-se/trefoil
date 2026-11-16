@@ -5,14 +5,14 @@ URL      ?= http://localhost$(ADDR)
 SETTINGS ?= $(CURDIR)/backend.yml
 AIR      ?= go run github.com/air-verse/air@v1.62.0
 
-.PHONY: dev seed build test test-bricks verify cli clean help
+.PHONY: dev seed build test test-modules verify cli clean help
 
 ## dev: run the API locally, restarting on file changes (Ctrl+C to stop); uses SETTINGS if it exists
 dev:
 ifneq ($(wildcard $(SETTINGS)),)
 	$(AIR) -c .air.toml -- -settings $(SETTINGS)
 else
-	ADDR=$(ADDR) DATA_DIR=$(DATA_DIR) BRICKS_DIR=$(CURDIR)/bricks $(AIR) -c .air.toml
+	ADDR=$(ADDR) DATA_DIR=$(DATA_DIR) MODULES_DIR=$(CURDIR)/modules $(AIR) -c .air.toml
 endif
 
 ## seed: package CONFIG and upload it to the running dev server
@@ -27,9 +27,9 @@ build:
 test:
 	cd api && go test ./...
 
-## test-bricks: build each shared brick's image and run its tests.py in it (BRICKS="core:os code:go" to pick)
-test-bricks:
-	cd api && go run ./cmd/bricktest -bricks $(CURDIR)/bricks $(BRICKS)
+## test-modules: build each shared module's image and run its tests.py in it (MODULES="core:os code:go" to pick)
+test-modules:
+	cd api && go run ./cmd/moduletest -modules $(CURDIR)/modules $(MODULES)
 
 ## verify: sync every example to the dev server and build all its agents' images (EXAMPLES="examples/go" to pick)
 verify:

@@ -19,7 +19,7 @@ import (
 // skillSpec is an entry in agent.json "skills". The harness finds installed
 // skills in /trefoil/skills itself; this records where each came from.
 type skillSpec struct {
-	Brick string `json:"brick"`
+	Module string `json:"module"`
 	// Name is empty for a URL skill named by its own SKILL.md.
 	Name   string `json:"name,omitempty"`
 	Source string `json:"source,omitempty"`

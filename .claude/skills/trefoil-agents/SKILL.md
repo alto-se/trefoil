@@ -1,12 +1,12 @@
 ---
 name: trefoil-agents
-description: Use when creating or changing a trefoil agent, brick or config (config.yml with agents/bricks/defaults/params), or when deciding which tools, layers, skills or MCP servers an agent needs.
+description: Use when creating or changing a trefoil agent, module or config (config.yml with agents/modules/defaults/params), or when deciding which tools, layers, skills or MCP servers an agent needs.
 ---
 
-# Building trefoil bricks and agents
+# Building trefoil modules and agents
 
-An agent is a config entry: name, bricks, input_schema, prompts, limits.
-Bricks give it capabilities: `layers` (build-time shell), `tools`, `skills`,
+An agent is a config entry: name, modules, input_schema, prompts, limits.
+Modules give it capabilities: `layers` (build-time shell), `tools`, `skills`,
 `mcps`, `server_tools`, `secrets`. Most of the work in a new agent should be
 the **prompt**, not new code.
 
@@ -15,7 +15,7 @@ the **prompt**, not new code.
 Writing a new tool is the last resort. Before adding anything to `tools:`, go
 down this list and stop at the first thing that works:
 
-1. **An existing shared brick** (table below). `core:os` Bash already runs any
+1. **An existing shared module** (table below). `core:os` Bash already runs any
    CLI, script or `curl`; `code:python` runs Python with pip packages.
 2. **A layer + the prompt.** Need `jq`, `ffmpeg`, `gh`, `pandoc`? Add a
    `layers:` entry that installs it and tell the agent in the prompt to call it
@@ -34,9 +34,9 @@ If you do write a tool, say why the options above didn't fit.
 
 ### Too many, too specific tools
 
-Signs a brick has gone wrong — don't write or recommend bricks like this:
+Signs a module has gone wrong — don't write or recommend modules like this:
 
-- **Many tools in one brick** (5+), several hundred lines of `tools.py` with
+- **Many tools in one module** (5+), several hundred lines of `tools.py` with
   private helpers, shared state hacks (`sys.modules` tricks to keep a process
   alive between tools) and a long-running daemon behind them.
 - **Tools named after one product or workflow**: `OpenPace`,
@@ -52,7 +52,7 @@ Instead, split by capability and push the workflow into the prompt:
 
 | Specific tool | Generic replacement |
 |---|---|
-| `OpenPace`, `Browser`, `Screenshot` | one browser brick (or `core:chromium`) with allowed hosts and login from params/secrets |
+| `OpenPace`, `Browser`, `Screenshot` | one browser module (or `core:chromium`) with allowed hosts and login from params/secrets |
 | `StartRecording`/`StopRecording` + ffmpeg | `ffmpeg` installed by a layer, called through Bash |
 | `CheckGuide` | a skill with the guide conventions and a `check.py` the agent runs |
 | `OpenDocsPullRequest` | `code:github` (`CloneRepo`) + `git` through Bash with `GITHUB_TOKEN` (add a layer for `gh` if needed) |
@@ -60,12 +60,12 @@ Instead, split by capability and push the workflow into the prompt:
 Aim for few tools with general inputs (`url`, `path`, `sql`, `command`);
 the prompt says which hosts, repos and folders this agent works on.
 
-## Rule 2: use core bricks when they exist
+## Rule 2: use core modules when they exist
 
-Always check `bricks/` first (`find bricks -name config.yml`) — the list
-grows. Current shared bricks:
+Always check `modules/` first (`find modules -name config.yml`) — the list
+grows. Current shared modules:
 
-| Brick | Gives the agent |
+| Module | Gives the agent |
 |---|---|
 | `core:os` | `Read`, `Write`, `Bash` — almost every agent wants this |
 | `core:trefoil` | `SaveArtifact` — files the user downloads after the run |
@@ -83,14 +83,14 @@ grows. Current shared bricks:
 
 `code:posthog` and `core:websearch` are unfinished stubs — don't use them.
 
-Bricks shared by every agent in a config go in `defaults.bricks`; per-agent
-ones in the agent's `bricks:`. Need something a shared brick almost covers?
-Add a **local** brick (no `ns:` prefix, under top-level `bricks:`) with just
-the missing layer — don't copy the shared brick.
+Modules shared by every agent in a config go in `defaults.modules`; per-agent
+ones in the agent's `modules:`. Need something a shared module almost covers?
+Add a **local** module (no `ns:` prefix, under top-level `modules:`) with just
+the missing layer — don't copy the shared module.
 
-## Rule 3: keep bricks generic
+## Rule 3: keep modules generic
 
-A brick is a capability, not a part of one agent. Write it so the next agent
+A module is a capability, not a part of one agent. Write it so the next agent
 can list it unchanged:
 
 - **Name it for what it does**, not who uses it: `browser`, `sentry`,
@@ -98,15 +98,15 @@ can list it unchanged:
 - **No agent logic inside.** Hosts, repos, projects, queries, thresholds and
   credentials come from params, secrets, env or tool input — never hard-coded
   in the layer, tool or skill. The agent's workflow belongs in its prompt.
-- **Small and focused.** One capability per brick; an agent combines several.
-  Split a brick that mixes unrelated things (a CLI install plus one agent's
+- **Small and focused.** One capability per module; an agent combines several.
+  Split a module that mixes unrelated things (a CLI install plus one agent's
   report format).
 - **Generic tool shapes**: `Query(sql)`, `OpenPage(url)` over
   `GetYesterdaysCheckoutErrors()`.
 
-An agent-specific brick is OK only when the capability truly can't be
+An agent-specific module is OK only when the capability truly can't be
 reused (a one-off parser for one system's format). Even then keep it local
-(`trefoil/bricks/<name>/`), and promote it to a shared brick once a second
+(`trefoil/modules/<name>/`), and promote it to a shared module once a second
 agent needs it.
 
 ## Bad pattern: an app hidden in a layer script
@@ -116,22 +116,22 @@ Don't write programs into a layer with heredocs — `cat > package.json`,
 Hundreds of lines of source and lockfile inside a YAML string can't be
 linted, tested, diffed or reused, and the capability is welded to one agent.
 
-Make it a brick of its own instead (e.g. `bricks/browser/`), so any agent can
+Make it a module of its own instead (e.g. `modules/browser/`), so any agent can
 list it:
 
-- **Check first** whether a shared brick already covers it (`core:chromium`
+- **Check first** whether a shared module already covers it (`core:chromium`
   for a headless browser).
 - **Layer = dependencies only**, short and pinned: `apt-get install chromium`,
   `npm install --prefix /opt/browser puppeteer-core@25.12.0`,
   `pip install ...`. Layers run before tools and skills are copied in, so a
-  layer can't build from the brick's own files.
-- **Code = real files in the brick**: a skill folder/zip with the script
+  layer can't build from the module's own files.
+- **Code = real files in the module**: a skill folder/zip with the script
   (`skills/browser/SKILL.md` + `browser.mjs`, installed at
   `/trefoil/skills/browser/`, run with Bash), or `tools.py` if it must be a
   tool (Rule 1).
 - **Config through env/secrets** (`secrets:`), never typed by the model —
   credentials in particular.
-- **`tests.py`** next to `config.yml` for shared bricks (`make test-bricks`).
+- **`tests.py`** next to `config.yml` for shared modules (`make test-modules`).
 
 ## Folder layout
 
@@ -139,34 +139,34 @@ A project that keeps its trefoil config in its own repo uses:
 
 ```
 trefoil/
-  config.yml                 # params, defaults, agents: !Ref, bricks: !Ref
+  config.yml                 # params, defaults, agents: !include, modules: !include
   agents/<name>/config.yml   # one agent per folder
   agents/<name>/prompt.md
-  bricks/<name>/config.yml   # local bricks, laid out like shared ones
-  bricks/<name>/tools.py
-  bricks/<name>/skills/<skill>.zip
+  modules/<name>/config.yml   # local modules, laid out like shared ones
+  modules/<name>/tools.py
+  modules/<name>/skills/<skill>.zip
 ```
 
 ```yaml
 # trefoil/config.yml
 agents:
-  - !Ref file://agents/error-triage/config.yml
-bricks:
-  log-triage: !Ref file://bricks/log-triage/config.yml
+  - !include file://agents/error-triage/config.yml
+modules:
+  log-triage: !include file://modules/log-triage/config.yml
 ```
 
 Refs resolve against the referencing file's folder, so an agent's
-`prompt.md` is `!Ref file://prompt.md`.
+`prompt.md` is `!include file://prompt.md`.
 
 ## Where things go
 
-- Agent only for this config → local brick in `trefoil/bricks/<name>/`
-  (`bricks: {name: !Ref file://bricks/name/config.yml}`), see `examples/local`.
-- Reusable across configs → shared brick `bricks/<ns>/<name>/config.yml`
+- Agent only for this config → local module in `trefoil/modules/<name>/`
+  (`modules: {name: !include file://modules/name/config.yml}`), see `examples/local`.
+- Reusable across configs → shared module `modules/<ns>/<name>/config.yml`
   (+ `tools.py`, `skills/*.zip`, `tests.py`), referenced as `ns:name`.
 - Values the user sets once (a repo, a project id) → top-level `params`, not
   hard-coded in prompts. See `examples/repo-ops`.
-- Credentials → brick `secrets:` (`trefoil secrets set --name=...`), never in
+- Credentials → module `secrets:` (`trefoil secrets set --name=...`), never in
   config or prompts.
 
 ## Agent template
@@ -174,14 +174,14 @@ Refs resolve against the referencing file's folder, so an agent's
 ```yaml
 agents:
   - name: my-agent
-    bricks: [core:os, core:trefoil]
+    modules: [core:os, core:trefoil]
     input_schema:
       type: object
       properties:
         task: { type: string, description: "What to do" }
       required: [task]
     prompts:
-      - source: !Ref file://prompts/my-agent.md
+      - source: !include file://prompts/my-agent.md
         role: system
     limits: { max_turns: 20, timeout_seconds: 600, max_cost_usd: 1.00 }
 
@@ -208,7 +208,7 @@ layers:
       jq --version            # fail the build early if it didn't install
 
 skills:
-  - source: !Ref file://skills/my-skill.zip   # zip -rX my-skill.zip my-skill
+  - source: !include file://skills/my-skill.zip   # zip -rX my-skill.zip my-skill
 
 tools:                                          # last resort, see Rule 1
   - name: DoThing
@@ -219,7 +219,7 @@ tools:                                          # last resort, see Rule 1
       required: [x]
     command:
       language: python
-      code: { content: !Ref file://tools.py, entry: DoThing }
+      code: { content: !include file://tools.py, entry: DoThing }
 ```
 
 ## Verify
@@ -228,10 +228,10 @@ tools:                                          # last resort, see Rule 1
 trefoil config sync path/to/config.yml       # validates against the schema
 trefoil agents build --agent=my-agent
 trefoil agents run --agent=my-agent "task text"
-make test-bricks BRICKS="ns:name"            # if you added/changed a shared brick
+make test-modules MODULES="ns:name"            # if you added/changed a shared module
 make verify EXAMPLES="examples/x"            # if you added an example
 ```
 
 Check the run's timeline (`/#runs/<id>`) — if the agent fumbles a step every
 run, fix the prompt or add a skill before reaching for a tool. Update
-`AGENTS.md` when you add a shared brick.
+`AGENTS.md` when you add a shared module.

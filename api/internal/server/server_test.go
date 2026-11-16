@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"trefoil/api/internal/bricks"
 	"trefoil/api/internal/build"
 	"trefoil/api/internal/conf"
 	"trefoil/api/internal/jobs"
+	"trefoil/api/internal/modules"
 	"trefoil/api/internal/schema"
 	"trefoil/api/internal/sessions"
 	"trefoil/api/internal/store"
@@ -148,7 +148,7 @@ func newTestHandlerWithDocker(t *testing.T) (http.Handler, *fakeDocker) {
 	}
 	d := &fakeDocker{built: map[string]*build.Context{}}
 	dataDir := t.TempDir()
-	return New(slog.New(slog.NewTextHandler(io.Discard, nil)), store.NewLocal(dataDir), v, d, filepath.Join(dataDir, "builds"), bricks.NewLibrary(filepath.Join(dataDir, "shared"))), d
+	return New(slog.New(slog.NewTextHandler(io.Discard, nil)), store.NewLocal(dataDir), v, d, filepath.Join(dataDir, "builds"), modules.NewLibrary(filepath.Join(dataDir, "shared"))), d
 }
 
 func do(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
@@ -170,7 +170,7 @@ func TestHealth(t *testing.T) {
 
 func TestConfRoundTrip(t *testing.T) {
 	h := newTestHandler(t)
-	conf := `{"bricks":{"os":{"tools":[{"name":"Write","command":{"language":"python","code":"file://commands/write.py"}}]}},"defaults":{"bricks":["os"],"max_tokens":1000}}`
+	conf := `{"modules":{"os":{"tools":[{"name":"Write","command":{"language":"python","code":"file://commands/write.py"}}]}},"defaults":{"modules":["os"],"max_tokens":1000}}`
 
 	if rec := do(h, http.MethodGet, "/conf", ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("GET before POST: status = %d, want 404", rec.Code)
@@ -184,13 +184,13 @@ func TestConfRoundTrip(t *testing.T) {
 	}
 }
 
-func TestConfWithoutBricks(t *testing.T) {
+func TestConfWithoutModules(t *testing.T) {
 	h := newTestHandler(t)
 	if rec := do(h, http.MethodPost, "/conf", `{"agents":[{"name":"echo"}]}`); rec.Code != http.StatusCreated {
 		t.Fatalf("POST: status = %d, body = %s", rec.Code, rec.Body)
 	}
 	rec := do(h, http.MethodGet, "/agents", "")
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"bricks":[]`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"modules":[]`) {
 		t.Fatalf("GET /agents: status = %d, body = %s", rec.Code, rec.Body)
 	}
 }
@@ -198,11 +198,11 @@ func TestConfWithoutBricks(t *testing.T) {
 func TestConfRejectsInvalid(t *testing.T) {
 	h := newTestHandler(t)
 	cases := map[string]string{
-		"malformed":       `{"bricks":`,
-		"wrong type":      `{"bricks":{},"defaults":{"max_tokens":"lots"}}`,
-		"unknown top key": `{"bricks":{},"extra":1}`,
-		"agent no name":   `{"bricks":{},"agents":[{"bricks":[]}]}`,
-		"duplicate agent": `{"bricks":{},"agents":[{"name":"a"},{"name":"a"}]}`,
+		"malformed":       `{"modules":`,
+		"wrong type":      `{"modules":{},"defaults":{"max_tokens":"lots"}}`,
+		"unknown top key": `{"modules":{},"extra":1}`,
+		"agent no name":   `{"modules":{},"agents":[{"modules":[]}]}`,
+		"duplicate agent": `{"modules":{},"agents":[{"name":"a"},{"name":"a"}]}`,
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -323,7 +323,7 @@ func TestAgentBuildAndRun(t *testing.T) {
 		t.Fatalf("build before conf: status = %d, want 409", rec.Code)
 	}
 
-	conf := `{"bricks":{"os":{"layers":[{"title":"t","script":"echo hi"}]}},"agents":[{"name":"web","bricks":["os"]},{"name":"fixer"}]}`
+	conf := `{"modules":{"os":{"layers":[{"title":"t","script":"echo hi"}]}},"agents":[{"name":"web","modules":["os"]},{"name":"fixer"}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -378,15 +378,15 @@ func TestListAgents(t *testing.T) {
 		t.Fatalf("list before conf: status = %d, want 409", rec.Code)
 	}
 
-	conf := `{"bricks":{"os":{},"web":{}},"defaults":{"bricks":["os"],"model":"claude-sonnet-5","provider":"bedrock"},"agents":[{"name":"web","bricks":["web","os"]},{"name":"fixer","prompts":[{"source":"p"}]}]}`
+	conf := `{"modules":{"os":{},"web":{}},"defaults":{"modules":["os"],"model":"claude-sonnet-5","provider":"bedrock"},"agents":[{"name":"web","modules":["web","os"]},{"name":"fixer","prompts":[{"source":"p"}]}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
 	buildAndWait(t, h, "/agents/fixer/build")
 
 	rec := do(h, http.MethodGet, "/agents", "")
-	want := `[{"name":"web","model":"claude-sonnet-5","provider":"bedrock","bricks":["os","web"],"prompts":0,"image":"trefoil-agent-web:latest","built":false},` +
-		`{"name":"fixer","model":"claude-sonnet-5","provider":"bedrock","bricks":["os"],"prompts":1,"image":"trefoil-agent-fixer:latest","built":true}]` + "\n"
+	want := `[{"name":"web","model":"claude-sonnet-5","provider":"bedrock","modules":["os","web"],"prompts":0,"image":"trefoil-agent-web:latest","built":false},` +
+		`{"name":"fixer","model":"claude-sonnet-5","provider":"bedrock","modules":["os"],"prompts":1,"image":"trefoil-agent-fixer:latest","built":true}]` + "\n"
 	if rec.Code != http.StatusOK || rec.Body.String() != want {
 		t.Fatalf("GET /agents: status = %d\n got: %s\nwant: %s", rec.Code, rec.Body, want)
 	}
@@ -394,7 +394,7 @@ func TestListAgents(t *testing.T) {
 
 func TestListJobs(t *testing.T) {
 	h, _ := newTestHandlerWithDocker(t)
-	conf := `{"bricks":{},"agents":[{"name":"a"},{"name":"b"}]}`
+	conf := `{"modules":{},"agents":[{"name":"a"},{"name":"b"}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -428,9 +428,9 @@ func TestPostConfWritesBuildContexts(t *testing.T) {
 	}
 	dataDir := t.TempDir()
 	h := New(slog.New(slog.NewTextHandler(io.Discard, nil)), store.NewLocal(dataDir), v,
-		&fakeDocker{built: map[string]*build.Context{}}, filepath.Join(dataDir, "builds"), bricks.NewLibrary(filepath.Join(dataDir, "shared")))
+		&fakeDocker{built: map[string]*build.Context{}}, filepath.Join(dataDir, "builds"), modules.NewLibrary(filepath.Join(dataDir, "shared")))
 
-	conf := `{"bricks":{"os":{"layers":[{"title":"t","script":"echo hi"}]}},"agents":[{"name":"fixer","bricks":["os"]}]}`
+	conf := `{"modules":{"os":{"layers":[{"title":"t","script":"echo hi"}]}},"agents":[{"name":"fixer","modules":["os"]}]}`
 	rec := do(h, http.MethodPost, "/conf", conf)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
@@ -446,13 +446,13 @@ func TestPostConfWritesBuildContexts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bad := `{"bricks":{},"agents":[{"name":"x","bricks":["missing"]}]}`
+	bad := `{"modules":{},"agents":[{"name":"x","modules":["missing"]}]}`
 	if rec := do(h, http.MethodPost, "/conf", bad); rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("unknown brick: status = %d, want 422", rec.Code)
+		t.Fatalf("unknown module: status = %d, want 422", rec.Code)
 	}
 }
 
-func TestSharedBricks(t *testing.T) {
+func TestSharedModules(t *testing.T) {
 	v, err := schema.NewConf()
 	if err != nil {
 		t.Fatal(err)
@@ -465,9 +465,9 @@ func TestSharedBricks(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := New(slog.New(slog.NewTextHandler(io.Discard, nil)), store.NewLocal(dataDir), v,
-		&fakeDocker{built: map[string]*build.Context{}}, filepath.Join(dataDir, "builds"), bricks.NewLibrary(shared))
+		&fakeDocker{built: map[string]*build.Context{}}, filepath.Join(dataDir, "builds"), modules.NewLibrary(shared))
 
-	conf := `{"bricks":{},"agents":[{"name":"a","bricks":["core:web"]}]}`
+	conf := `{"modules":{},"agents":[{"name":"a","modules":["core:web"]}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -475,13 +475,13 @@ func TestSharedBricks(t *testing.T) {
 	if !strings.Contains(string(df), "# core:web: web\nRUN echo shared") {
 		t.Fatalf("Dockerfile = %s", df)
 	}
-	if rec := do(h, http.MethodGet, "/agents", ""); !strings.Contains(rec.Body.String(), `"bricks":["core:web"]`) {
+	if rec := do(h, http.MethodGet, "/agents", ""); !strings.Contains(rec.Body.String(), `"modules":["core:web"]`) {
 		t.Fatalf("GET /agents = %s", rec.Body)
 	}
 
 	for name, body := range map[string]string{
-		"missing shared brick": `{"bricks":{},"agents":[{"name":"a","bricks":["core:nope"]}]}`,
-		"shadowed locally":     `{"bricks":{"core:web":{}},"agents":[{"name":"a","bricks":["core:web"]}]}`,
+		"missing shared module": `{"modules":{},"agents":[{"name":"a","modules":["core:nope"]}]}`,
+		"shadowed locally":      `{"modules":{"core:web":{}},"agents":[{"name":"a","modules":["core:web"]}]}`,
 	} {
 		if rec := do(h, http.MethodPost, "/conf", body); rec.Code != http.StatusUnprocessableEntity {
 			t.Errorf("%s: status = %d, want 422, body = %s", name, rec.Code, rec.Body)
@@ -491,7 +491,7 @@ func TestSharedBricks(t *testing.T) {
 
 func TestRunPassesLimits(t *testing.T) {
 	h, d := newTestHandlerWithDocker(t)
-	conf := `{"bricks":{},"defaults":{"limits":{"max_turns":10,"timeout_seconds":30,"max_cost_usd":1}},` +
+	conf := `{"modules":{},"defaults":{"limits":{"max_turns":10,"timeout_seconds":30,"max_cost_usd":1}},` +
 		`"agents":[{"name":"a","limits":{"max_turns":3,"token_budget":50000}}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
@@ -504,7 +504,7 @@ func TestRunPassesLimits(t *testing.T) {
 	if d.runOpts.Timeout != 30*time.Second {
 		t.Fatalf("timeout = %s", d.runOpts.Timeout)
 	}
-	bad := `{"bricks":{},"agents":[{"name":"a","limits":{"max_turns":0}}]}`
+	bad := `{"modules":{},"agents":[{"name":"a","limits":{"max_turns":0}}]}`
 	if rec := do(h, http.MethodPost, "/conf", bad); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid limits: status = %d, want 422", rec.Code)
 	}
@@ -512,7 +512,7 @@ func TestRunPassesLimits(t *testing.T) {
 
 func TestStopRun(t *testing.T) {
 	h, d := newTestHandlerWithDocker(t)
-	if rec := do(h, http.MethodPost, "/conf", `{"bricks":{},"agents":[{"name":"a"}]}`); rec.Code != http.StatusCreated {
+	if rec := do(h, http.MethodPost, "/conf", `{"modules":{},"agents":[{"name":"a"}]}`); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
 	buildAndWait(t, h, "/agents/a/build")
@@ -548,8 +548,8 @@ func TestStopRun(t *testing.T) {
 
 func TestRunPassesSecrets(t *testing.T) {
 	h, d := newTestHandlerWithDocker(t)
-	conf := `{"bricks":{"gh":{"secrets":{"github_token":{"required":true},"extra":{}}}},` +
-		`"agents":[{"name":"a","bricks":["gh"]}]}`
+	conf := `{"modules":{"gh":{"secrets":{"github_token":{"required":true},"extra":{}}}},` +
+		`"agents":[{"name":"a","modules":["gh"]}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -585,7 +585,7 @@ func TestRunPassesSecrets(t *testing.T) {
 		}
 	}
 
-	bad := `{"bricks":{"gh":{"secrets":{"not-env":{}}}},"agents":[{"name":"a","bricks":["gh"]}]}`
+	bad := `{"modules":{"gh":{"secrets":{"not-env":{}}}},"agents":[{"name":"a","modules":["gh"]}]}`
 	if rec := do(h, http.MethodPost, "/conf", bad); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid secret name: status = %d, want 422", rec.Code)
 	}
@@ -619,7 +619,7 @@ func TestRunArtifacts(t *testing.T) {
 	}
 	d := &fakeDocker{built: map[string]*build.Context{}, artifacts: map[string]string{"page.pdf": "%PDF-1.4", "notes/a.html": "<script>x</script>"}}
 	h := New(slog.New(slog.NewTextHandler(io.Discard, nil)), store.NewLocal(dataDir), v, d, filepath.Join(dataDir, "builds"),
-		bricks.NewLibrary(filepath.Join(dataDir, "shared")), WithManagers(jobs.NewManager(), sess))
+		modules.NewLibrary(filepath.Join(dataDir, "shared")), WithManagers(jobs.NewManager(), sess))
 
 	if rec := do(h, http.MethodPost, "/conf", `{"agents":[{"name":"pdf"}]}`); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
@@ -659,7 +659,7 @@ func TestAgentContextZip(t *testing.T) {
 	if rec := do(h, http.MethodGet, "/agents/web/context", ""); rec.Code != http.StatusConflict {
 		t.Fatalf("context before conf: status = %d, want 409", rec.Code)
 	}
-	conf := `{"bricks":{"os":{"layers":[{"title":"t","script":"echo hi"}]}},"agents":[{"name":"Web.App","bricks":["os"]}]}`
+	conf := `{"modules":{"os":{"layers":[{"title":"t","script":"echo hi"}]}},"agents":[{"name":"Web.App","modules":["os"]}]}`
 	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}

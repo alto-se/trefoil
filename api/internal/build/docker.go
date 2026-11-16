@@ -48,7 +48,7 @@ type RunOptions struct {
 }
 
 // ArtifactsDir is where tools in the container put files for the server to
-// collect after the run (see the core:trefoil brick).
+// collect after the run (see the core:trefoil module).
 const ArtifactsDir = "/trefoil/artifacts"
 
 // ExitTimedOut is the exit code reported when a run is killed for

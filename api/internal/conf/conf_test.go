@@ -50,3 +50,13 @@ func TestSkillSourceForms(t *testing.T) {
 		t.Error("want error for numeric source")
 	}
 }
+
+func TestParseLegacyBricksKey(t *testing.T) {
+	c, err := Parse([]byte(`{"bricks":{"x":{}},"defaults":{"bricks":["core:os"]},"agents":[{"name":"a","bricks":["x"]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := c.Modules["x"]; !ok || len(c.Defaults.Modules) != 1 || len(c.Agents[0].Modules) != 1 {
+		t.Fatalf("legacy bricks key not upgraded: %+v", c)
+	}
+}

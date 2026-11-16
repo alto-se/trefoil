@@ -89,7 +89,7 @@ TASK_BUDGET_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-fable-5", "cla
 MIN_TASK_BUDGET = 20000
 
 # Anthropic-hosted tool versions (dynamic filtering; Claude 4.6+ models).
-# A brick can pin another version with `type:`.
+# A module can pin another version with `type:`.
 SERVER_TOOL_TYPES = {"web_search": "web_search_20260318", "web_fetch": "web_fetch_20260318"}
 
 # Models that support server-side refusal fallbacks.
@@ -504,7 +504,7 @@ def main():
     handlers.update(mcp_handlers)
     skill_tools, skill_handlers, skills_prompt = load_skills()
     if skill_handlers.keys() & handlers.keys():
-        sys.exit(f"[harness] a brick tool is named {SKILL_TOOL}, which skills need")
+        sys.exit(f"[harness] a module tool is named {SKILL_TOOL}, which skills need")
     tools += skill_tools
     handlers.update(skill_handlers)
     tools += server_tool_definitions(spec)

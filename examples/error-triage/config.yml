@@ -4,7 +4,7 @@
 # and suggested fix, it never changes resources.
 agents:
   - name: error-triage
-    bricks:
+    modules:
       - cloud:aws
     input_schema:
       type: object
@@ -15,7 +15,7 @@ agents:
         since_hours: { type: integer, description: "How far back to search the logs, in hours", default: 24, minimum: 1, maximum: 336 }
       required: [issue]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
     limits:
       max_turns: 40

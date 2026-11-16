@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"trefoil/api/internal/bricks"
 	"trefoil/api/internal/build"
 	"trefoil/api/internal/conf"
 	"trefoil/api/internal/jobs"
+	"trefoil/api/internal/modules"
 	"trefoil/api/internal/sessions"
 )
 
@@ -48,7 +48,7 @@ func (s *server) registerUI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /ui/secrets", s.handleUISetSecret)
 	mux.HandleFunc("GET /ui/params", s.handleUIParams)
 	mux.HandleFunc("POST /ui/params", s.handleUISetParams)
-	mux.HandleFunc("GET /ui/bricks", s.handleUIBricks)
+	mux.HandleFunc("GET /ui/modules", s.handleUIModules)
 }
 
 func (s *server) uiPage(name string, data any) http.HandlerFunc {
@@ -74,7 +74,7 @@ type agentView struct {
 	Name     string
 	Model    string
 	Provider string
-	Bricks   []string
+	Modules  []string
 	Limits   conf.Limits
 	Prompts  []conf.Prompt
 	Tools    []agentTool
@@ -88,7 +88,7 @@ type agentView struct {
 // tool; Schema is its input schema as indented JSON.
 type agentTool struct {
 	Name        string
-	Brick       string
+	Module      string
 	Kind        string
 	Description string
 	Schema      string
@@ -96,7 +96,7 @@ type agentTool struct {
 
 type agentSkill struct {
 	Name        string
-	Brick       string
+	Module      string
 	Source      string
 	Description string
 }
@@ -125,11 +125,11 @@ func (s *server) agentDetails(ctx context.Context, view *agentView) error {
 	var spec struct {
 		Model    string        `json:"model"`
 		Provider string        `json:"provider"`
-		Bricks   []string      `json:"bricks"`
+		Modules  []string      `json:"modules"`
 		Limits   conf.Limits   `json:"limits"`
 		Prompts  []conf.Prompt `json:"prompts"`
 		Tools    []struct {
-			Brick       string         `json:"brick"`
+			Module      string         `json:"module"`
 			Name        string         `json:"name"`
 			Description string         `json:"description"`
 			InputSchema map[string]any `json:"input_schema"`
@@ -142,10 +142,10 @@ func (s *server) agentDetails(ctx context.Context, view *agentView) error {
 	if err := json.Unmarshal(bc.Files["agent.json"], &spec); err != nil {
 		return err
 	}
-	view.Model, view.Provider, view.Bricks, view.Limits = spec.Model, spec.Provider, spec.Bricks, spec.Limits
+	view.Model, view.Provider, view.Modules, view.Limits = spec.Model, spec.Provider, spec.Modules, spec.Limits
 	view.Prompts, view.MCPs, view.Skills = spec.Prompts, spec.MCPs, spec.Skills
 	for _, t := range spec.Tools {
-		view.Tools = append(view.Tools, agentTool{Name: t.Name, Brick: t.Brick, Kind: t.Language,
+		view.Tools = append(view.Tools, agentTool{Name: t.Name, Module: t.Module, Kind: t.Language,
 			Description: t.Description, Schema: prettyJSON(t.InputSchema)})
 	}
 	for _, t := range spec.ServerTools {
@@ -180,39 +180,39 @@ func (s *server) handleUIJob(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "job.html", j.Snapshot())
 }
 
-// brickRow is one brick in the config, with the agents built from it.
-type brickRow struct {
+// moduleRow is one module in the config, with the agents built from it.
+type moduleRow struct {
 	Name   string
 	Shared bool
 	Agents []string
-	conf.Brick
+	conf.Module
 }
 
-func (s *server) handleUIBricks(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleUIModules(w http.ResponseWriter, r *http.Request) {
 	data := struct {
-		Bricks []brickRow
-		Error  string
+		Modules []moduleRow
+		Error   string
 	}{}
 	c, _, err := s.readConf(r.Context())
 	if err != nil {
 		data.Error = err.Error()
-		s.render(w, "bricks.html", data)
+		s.render(w, "modules.html", data)
 		return
 	}
 	users := map[string][]string{}
 	for i := range c.Agents {
-		for _, name := range build.AgentBricks(c, &c.Agents[i]) {
+		for _, name := range build.AgentModules(c, &c.Agents[i]) {
 			users[name] = append(users[name], c.Agents[i].Name)
 		}
 	}
-	for name, b := range c.Bricks {
-		data.Bricks = append(data.Bricks, brickRow{Name: name, Shared: bricks.IsShared(name), Agents: users[name], Brick: b})
+	for name, b := range c.Modules {
+		data.Modules = append(data.Modules, moduleRow{Name: name, Shared: modules.IsShared(name), Agents: users[name], Module: b})
 	}
-	sort.Slice(data.Bricks, func(i, j int) bool { return data.Bricks[i].Name < data.Bricks[j].Name })
-	s.render(w, "bricks.html", data)
+	sort.Slice(data.Modules, func(i, j int) bool { return data.Modules[i].Name < data.Modules[j].Name })
+	s.render(w, "modules.html", data)
 }
 
-// secretRow is one secret the config's bricks declare. Source is where its
+// secretRow is one secret the config's modules declare. Source is where its
 // value comes from: "stored", "env" or "" when it has none.
 type secretRow struct {
 	Name     string

@@ -14,7 +14,7 @@ var confSchema []byte
 // Validator checks JSON documents against a compiled JSON Schema.
 type Validator struct {
 	schema *jsonschema.Schema
-	brick  *jsonschema.Schema
+	module *jsonschema.Schema
 }
 
 // NewConf returns a validator for the /conf payload.
@@ -31,11 +31,11 @@ func NewConf() (*Validator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("compile schema: %w", err)
 	}
-	b, err := c.Compile("urn:trefoil:conf#/$defs/brick")
+	b, err := c.Compile("urn:trefoil:conf#/$defs/module")
 	if err != nil {
-		return nil, fmt.Errorf("compile brick schema: %w", err)
+		return nil, fmt.Errorf("compile module schema: %w", err)
 	}
-	return &Validator{schema: s, brick: b}, nil
+	return &Validator{schema: s, module: b}, nil
 }
 
 // Validate parses data as JSON and validates it. A malformed document and a
@@ -48,12 +48,12 @@ func (v *Validator) Validate(data []byte) error {
 	return v.schema.Validate(inst)
 }
 
-// ValidateBrick validates a single brick, such as a shared brick loaded
+// ValidateModule validates a single module, such as a shared module loaded
 // from disk.
-func (v *Validator) ValidateBrick(data []byte) error {
+func (v *Validator) ValidateModule(data []byte) error {
 	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("invalid json: %w", err)
 	}
-	return v.brick.Validate(inst)
+	return v.module.Validate(inst)
 }

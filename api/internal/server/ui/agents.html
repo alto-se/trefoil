@@ -2,14 +2,14 @@
 {{else if not .Agents}}<div class="empty">No agents in the stored config.</div>
 {{else}}
 <table>
-  <tr><th>Name</th><th>Model</th><th>Bricks</th><th>Input</th><th></th></tr>
+  <tr><th>Name</th><th>Model</th><th>Modules</th><th>Input</th><th></th></tr>
   {{range .Agents}}
   <tr>
     <td class="nowrap"><a class="agent" href="#agents/{{.Name}}" title="Prompts and tools"><strong>{{.Name}}</strong></a>
       <span class="sub">{{if .Built}}<span class="pill built" title="{{.Image}}">built</span>{{else}}<span class="pill notbuilt" title="{{.Image}}">not built</span>{{end}}</span>
       {{if .MissingSecrets}}<div class="failed">needs secret {{range $i, $n := .MissingSecrets}}{{if $i}}, {{end}}<code>{{$n}}</code>{{end}}</div>{{end}}</td>
     <td class="nowrap">{{if .Model}}<code>{{.Model}}</code>{{else}}<span class="muted">default</span>{{end}}{{with .Provider}}<span class="sub">via {{.}}</span>{{end}}</td>
-    <td><div class="tags">{{range .Bricks}}<code>{{.}}</code>{{end}}</div></td>
+    <td><div class="tags">{{range .Modules}}<code>{{.}}</code>{{end}}</div></td>
     <td><div class="tags">{{with .InputSchema}}{{range .Props}}<code{{with .Description}} title="{{.}}"{{end}}>{{.Name}}: {{.Type}}</code>{{end}}{{else}}<span class="muted">task</span>{{end}}</div></td>
     <td class="cell-actions"><div class="actions">
       <button hx-post="/agents/{{.Name}}/build" hx-swap="none" hx-on::after-request="htmx.trigger('#jobs', 'refresh')">Build</button>

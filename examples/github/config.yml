@@ -1,6 +1,6 @@
 agents:
   - name: github
-    bricks:
+    modules:
       - code:github
       - core:os
     input_schema:
@@ -10,7 +10,7 @@ agents:
         question: { type: string }
       required: [repo, question]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:

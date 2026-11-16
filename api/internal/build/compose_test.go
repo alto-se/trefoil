@@ -14,7 +14,7 @@ import (
 
 func TestCompose(t *testing.T) {
 	c := &conf.Conf{
-		Bricks: map[string]conf.Brick{
+		Modules: map[string]conf.Module{
 			"os": {
 				Layers: []conf.Layer{{Title: "base", Script: "apt-get update"}},
 				Tools:  []conf.Tool{{Name: "Write", Command: conf.Command{Language: "python", Code: "def Write(args): pass"}}},
@@ -31,9 +31,9 @@ func TestCompose(t *testing.T) {
 				ServerTools: []conf.ServerTool{{"name": "web_search", "max_uses": 3}},
 			},
 		},
-		Defaults: conf.Defaults{Bricks: []string{"os"}, Model: "m"},
+		Defaults: conf.Defaults{Modules: []string{"os"}, Model: "m"},
 	}
-	agent := &conf.Agent{Name: "fixer", Bricks: []string{"chromium", "os", "search"}}
+	agent := &conf.Agent{Name: "fixer", Modules: []string{"chromium", "os", "search"}}
 
 	bc, err := Compose(c, agent)
 	if err != nil {
@@ -89,15 +89,15 @@ CMD ["python", "/trefoil/harness/main.py"]
 	if len(spec.ServerTools) != 1 || spec.ServerTools[0].Name() != "web_search" {
 		t.Fatalf("server tools = %+v", spec.ServerTools)
 	}
-	if strings.Join(spec.Bricks, ",") != "os,chromium,search" || len(spec.Tools) != 1 || spec.Tools[0].Path != "/trefoil/tools/os/write.py" ||
-		len(spec.Skills) != 2 || spec.Skills[0] != (skillSpec{Brick: "os", Name: "notes"}) {
+	if strings.Join(spec.Modules, ",") != "os,chromium,search" || len(spec.Tools) != 1 || spec.Tools[0].Path != "/trefoil/tools/os/write.py" ||
+		len(spec.Skills) != 2 || spec.Skills[0] != (skillSpec{Module: "os", Name: "notes"}) {
 		t.Fatalf("spec = %+v", spec)
 	}
 }
 
 func TestComposeBedrock(t *testing.T) {
 	c := &conf.Conf{
-		Bricks:   map[string]conf.Brick{},
+		Modules:  map[string]conf.Module{},
 		Defaults: conf.Defaults{Model: "m", Provider: "bedrock", AWSRegion: "eu-west-1"},
 	}
 	bc, err := Compose(c, &conf.Agent{Name: "echo"})
@@ -111,18 +111,18 @@ func TestComposeBedrock(t *testing.T) {
 	if err := json.Unmarshal(bc.Files["agent.json"], &spec); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(bc.Files["agent.json"]), `"bricks": []`) {
-		t.Fatalf("agent without bricks should encode bricks as []:\n%s", bc.Files["agent.json"])
+	if !strings.Contains(string(bc.Files["agent.json"]), `"modules": []`) {
+		t.Fatalf("agent without modules should encode modules as []:\n%s", bc.Files["agent.json"])
 	}
 	if spec.Provider != "bedrock" || spec.AWSRegion != "eu-west-1" {
 		t.Fatalf("spec = %+v", spec)
 	}
 }
 
-func TestComposeUnknownBrick(t *testing.T) {
-	c := &conf.Conf{Bricks: map[string]conf.Brick{}}
-	if _, err := Compose(c, &conf.Agent{Name: "a", Bricks: []string{"nope"}}); err == nil {
-		t.Fatal("want error for unknown brick")
+func TestComposeUnknownModule(t *testing.T) {
+	c := &conf.Conf{Modules: map[string]conf.Module{}}
+	if _, err := Compose(c, &conf.Agent{Name: "a", Modules: []string{"nope"}}); err == nil {
+		t.Fatal("want error for unknown module")
 	}
 }
 
@@ -134,11 +134,11 @@ func TestImageTag(t *testing.T) {
 
 func TestComposeMCP(t *testing.T) {
 	c := &conf.Conf{
-		Bricks: map[string]conf.Brick{"gh": {
+		Modules: map[string]conf.Module{"gh": {
 			Secrets: map[string]conf.Secret{"github_token": {Required: true}},
 			MCPs:    []conf.MCP{{Name: "github", URL: "https://example.com/mcp", Credentials: map[string]string{"Authorization": "Bearer ${GITHUB_TOKEN}"}}},
 		}},
-		Agents: []conf.Agent{{Name: "a", Bricks: []string{"gh"}}},
+		Agents: []conf.Agent{{Name: "a", Modules: []string{"gh"}}},
 	}
 	bc, err := Compose(c, &c.Agents[0])
 	if err != nil {
@@ -162,20 +162,20 @@ func TestComposeSkillErrors(t *testing.T) {
 		"skill name \"\"":       {Files: map[string]string{"SKILL.md": "---\ndescription: x\n---\n"}},
 		"inside the skill":      {Name: "x", Files: map[string]string{"SKILL.md": "", "../escape": ""}},
 	} {
-		c := &conf.Conf{Bricks: map[string]conf.Brick{"b": {Skills: []conf.Skill{skill}}}}
-		if _, err := Compose(c, &conf.Agent{Name: "a", Bricks: []string{"b"}}); err == nil || !strings.Contains(err.Error(), want) {
+		c := &conf.Conf{Modules: map[string]conf.Module{"b": {Skills: []conf.Skill{skill}}}}
+		if _, err := Compose(c, &conf.Agent{Name: "a", Modules: []string{"b"}}); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("err = %v, want %q", err, want)
 		}
 	}
 
 	skill := conf.Skill{Files: map[string]string{"SKILL.md": "---\r\nname: dup\r\n---\r\n"}}
-	c := &conf.Conf{Bricks: map[string]conf.Brick{"a": {Skills: []conf.Skill{skill}}, "b": {Skills: []conf.Skill{skill}}}}
-	if _, err := Compose(c, &conf.Agent{Name: "x", Bricks: []string{"a", "b"}}); err == nil || !strings.Contains(err.Error(), "in both brick") {
+	c := &conf.Conf{Modules: map[string]conf.Module{"a": {Skills: []conf.Skill{skill}}, "b": {Skills: []conf.Skill{skill}}}}
+	if _, err := Compose(c, &conf.Agent{Name: "x", Modules: []string{"a", "b"}}); err == nil || !strings.Contains(err.Error(), "in both module") {
 		t.Errorf("duplicate skill err = %v", err)
 	}
 }
 
-// zipSource zips files the way `!Ref file://skill.zip` packages them.
+// zipSource zips files the way `!include file://skill.zip` packages them.
 func zipSource(t *testing.T, files map[string]string) string {
 	t.Helper()
 	var buf bytes.Buffer
@@ -200,8 +200,8 @@ func TestComposeZipSkill(t *testing.T) {
 		"proofread/examples/SKILL.md":       "---\nname: nested\n---\n",
 		"__MACOSX/proofread/._checklist.md": "junk",
 	})
-	c := &conf.Conf{Bricks: map[string]conf.Brick{"b": {Skills: []conf.Skill{{Source: src}}}}}
-	bc, err := Compose(c, &conf.Agent{Name: "a", Bricks: []string{"b"}})
+	c := &conf.Conf{Modules: map[string]conf.Module{"b": {Skills: []conf.Skill{{Source: src}}}}}
+	bc, err := Compose(c, &conf.Agent{Name: "a", Modules: []string{"b"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,8 +229,8 @@ func TestComposeZipSkill(t *testing.T) {
 		"no SKILL.md":     zipSource(t, map[string]string{"README.md": ""}),
 		"skill name \"\"": zipSource(t, map[string]string{"SKILL.md": "---\ndescription: x\n---\n"}),
 	} {
-		c := &conf.Conf{Bricks: map[string]conf.Brick{"b": {Skills: []conf.Skill{{Source: source}}}}}
-		if _, err := Compose(c, &conf.Agent{Name: "a", Bricks: []string{"b"}}); err == nil || !strings.Contains(err.Error(), want) {
+		c := &conf.Conf{Modules: map[string]conf.Module{"b": {Skills: []conf.Skill{{Source: source}}}}}
+		if _, err := Compose(c, &conf.Agent{Name: "a", Modules: []string{"b"}}); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("err = %v, want %q", err, want)
 		}
 	}
@@ -238,10 +238,10 @@ func TestComposeZipSkill(t *testing.T) {
 
 func TestComposeMCPSigV4(t *testing.T) {
 	c := &conf.Conf{
-		Bricks: map[string]conf.Brick{"aws": {
+		Modules: map[string]conf.Module{"aws": {
 			MCPs: []conf.MCP{{Name: "aws", URL: "https://aws-mcp.us-east-1.api.aws/mcp", SigV4: &conf.SigV4{Service: "aws-mcp", Region: "us-east-1"}}},
 		}},
-		Agents: []conf.Agent{{Name: "a", Bricks: []string{"aws"}}},
+		Agents: []conf.Agent{{Name: "a", Modules: []string{"aws"}}},
 	}
 	bc, err := Compose(c, &c.Agents[0])
 	if err != nil {

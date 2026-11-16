@@ -7,9 +7,9 @@ import (
 
 // Conf is the packaged config accepted by POST /conf.
 type Conf struct {
-	Bricks   map[string]Brick `json:"bricks"`
-	Agents   []Agent          `json:"agents,omitempty"`
-	Defaults Defaults         `json:"defaults"`
+	Modules  map[string]Module `json:"modules"`
+	Agents   []Agent           `json:"agents,omitempty"`
+	Defaults Defaults          `json:"defaults"`
 	// Params declares config-wide values, written like an input_schema.
 	// Their values are set on the server (POST /param/{name} or the
 	// dashboard), falling back to each property's default; a run that
@@ -17,7 +17,7 @@ type Conf struct {
 	Params *InputSchema `json:"params,omitempty"`
 }
 
-type Brick struct {
+type Module struct {
 	Source        string            `json:"source,omitempty"`
 	Compatibility string            `json:"compatibility,omitempty"`
 	Skills        []Skill           `json:"skills,omitempty"`
@@ -115,7 +115,7 @@ type Command struct {
 // UnmarshalJSON accepts code as a string, or as {content, entry} so several
 // tools can share one file:
 //
-//	code: {content: !Ref file://tools.py, entry: Write}
+//	code: {content: !include file://tools.py, entry: Write}
 func (c *Command) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Language string          `json:"language"`
@@ -188,9 +188,9 @@ func (l Limits) Merge(fallback Limits) Limits {
 }
 
 type Agent struct {
-	Name   string   `json:"name"`
-	Limits Limits   `json:"limits,omitzero"`
-	Bricks []string `json:"bricks,omitempty"`
+	Name    string   `json:"name"`
+	Limits  Limits   `json:"limits,omitzero"`
+	Modules []string `json:"modules,omitempty"`
 	// InputSchema, if set, makes runs take a JSON object matching it
 	// instead of a free-form task.
 	InputSchema *InputSchema `json:"input_schema,omitempty"`
@@ -204,7 +204,7 @@ type Prompt struct {
 }
 
 type Defaults struct {
-	Bricks    []string `json:"bricks,omitempty"`
+	Modules   []string `json:"modules,omitempty"`
 	Model     string   `json:"model,omitempty"`
 	Provider  string   `json:"provider,omitempty"`
 	AWSRegion string   `json:"aws_region,omitempty"`
@@ -215,7 +215,7 @@ type Defaults struct {
 
 func Parse(data []byte) (*Conf, error) {
 	var c Conf
-	if err := json.Unmarshal(data, &c); err != nil {
+	if err := json.Unmarshal(Upgrade(data), &c); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -246,9 +246,9 @@ func (c *Conf) Agent(name string) (*Agent, error) {
 	return nil, fmt.Errorf("agent %q not found", name)
 }
 
-// BrickRefs returns every brick name used by defaults and agents, in order,
+// ModuleRefs returns every module name used by defaults and agents, in order,
 // without duplicates.
-func (c *Conf) BrickRefs() []string {
+func (c *Conf) ModuleRefs() []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(names []string) {
@@ -259,9 +259,9 @@ func (c *Conf) BrickRefs() []string {
 			}
 		}
 	}
-	add(c.Defaults.Bricks)
+	add(c.Defaults.Modules)
 	for _, a := range c.Agents {
-		add(a.Bricks)
+		add(a.Modules)
 	}
 	return out
 }

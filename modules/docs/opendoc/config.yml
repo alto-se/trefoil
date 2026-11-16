@@ -1,0 +1,74 @@
+name: "OpenDocument"
+
+# OpenDocument files (.odt, .ods, .odp) with headless LibreOffice: read them
+# (and docx/xlsx/pptx), convert between formats and to PDF, and create text
+# documents from HTML or spreadsheets from CSV. The skills add odfpy scripts
+# for spreadsheets with formulas, slide decks and template filling; they run
+# with /opt/odf/bin/python, so agents using them also need a shell tool
+# (core:os Bash). To edit a skill: cd skills && unzip odf-text.zip, change,
+# then zip -rX odf-text.zip odf-text
+skills:
+  - source: !include file://skills/odf-text.zip
+  - source: !include file://skills/odf-spreadsheet.zip
+  - source: !include file://skills/odf-presentation.zip
+
+layers:
+  - title: "Install LibreOffice"
+    description: "Headless Writer, Calc and Impress from Debian packages, with fonts"
+    script: |
+      apt-get update
+      apt-get install -y --no-install-recommends libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui fonts-liberation fonts-dejavu-core
+      rm -rf /var/lib/apt/lists/*
+      soffice --version
+
+  - title: "Install odfpy"
+    description: "A virtualenv at /opt/odf with odfpy, used by the skills' scripts"
+    script: |
+      python -m venv /opt/odf
+      /opt/odf/bin/pip install --no-cache-dir odfpy
+      /opt/odf/bin/python -c "import odf"
+
+tools:
+  - name: ReadDocument
+    description: "Returns the text of a document as Markdown-like lines: headings, lists and tables for text documents, each sheet's rows (with formulas) for spreadsheets, each slide's text and notes for presentations. Reads .odt/.ods/.odp and, by converting them first, .docx/.doc/.rtf/.xlsx/.xls/.csv/.pptx/.ppt"
+    input_schema:
+      type: object
+      properties:
+        path: { type: string, description: "Document to read" }
+        max_chars: { type: integer, description: "Cut the text after this many characters (default 30000)" }
+      required: [path]
+    command:
+      language: python
+      code:
+        content: !include file://tools.py
+        entry: ReadDocument
+
+  - name: ConvertDocument
+    description: "Converts a document with LibreOffice, e.g. odt to pdf or docx, ods to xlsx or csv (one file per sheet), pptx to odp, odp to pptx or pdf. Spreadsheet formulas are recalculated. Returns the files written"
+    input_schema:
+      type: object
+      properties:
+        path: { type: string, description: "Document to convert" }
+        format: { type: string, enum: [odt, ods, odp, pdf, docx, xlsx, pptx, html, txt, csv, png], description: "Target format (png renders the first page)" }
+        out_dir: { type: string, description: "Folder for the output, named like the input with the new extension (default: the input's folder)" }
+      required: [path, format]
+    command:
+      language: python
+      code:
+        content: !include file://tools.py
+        entry: ConvertDocument
+
+  - name: CreateDocument
+    description: "Creates a document from HTML (to .odt, .docx or .pdf: headings, lists, tables, CSS fonts and colours, @page size/margins, images from local paths) or from CSV (to .ods, .xlsx or .pdf)"
+    input_schema:
+      type: object
+      properties:
+        path: { type: string, description: "File to create; its extension picks the format, e.g. /workspace/out/report.odt" }
+        content: { type: string, description: "The full HTML document, or CSV text" }
+        source_format: { type: string, enum: [html, csv], description: "Format of content (default: csv for .ods/.xlsx, html otherwise)" }
+      required: [path, content]
+    command:
+      language: python
+      code:
+        content: !include file://tools.py
+        entry: CreateDocument

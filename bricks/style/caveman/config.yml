@@ -1,9 +1,0 @@
-name: "Caveman"
-
-# The caveman skill from https://github.com/JuliusBrussee/caveman (MIT, see
-# LICENSE in the zip): terse, low-token replies that keep the technical
-# substance.
-skills:
-  - name: caveman
-    source: !Ref file://skills/caveman.zip
-    autoload: true

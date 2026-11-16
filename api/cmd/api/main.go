@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"trefoil/api/internal/bricks"
 	"trefoil/api/internal/build"
 	"trefoil/api/internal/jobs"
+	"trefoil/api/internal/modules"
 	"trefoil/api/internal/schema"
 	"trefoil/api/internal/server"
 	"trefoil/api/internal/sessions"
@@ -61,7 +61,7 @@ func main() {
 	srv := &http.Server{
 		Addr: addr,
 		Handler: server.New(logger, store.NewLocal(dataDir), validator, build.CLI{Env: cfg.AgentEnv()},
-			filepath.Join(dataDir, "builds"), bricks.NewLibrary(cfg.BricksDir),
+			filepath.Join(dataDir, "builds"), modules.NewLibrary(cfg.ModulesDir),
 			server.WithProviders(cfg.LLMProvider), server.WithManagers(jobManager, sessionManager)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

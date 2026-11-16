@@ -4,26 +4,26 @@ Notes for coding agents working in this repo.
 
 ## Layout
 
-- `api/` — Go API server (`api/cmd/api`), internal packages under `api/internal/` (conf, bricks, build, jobs, sessions, server, settings, store, schema).
+- `api/` — Go API server (`api/cmd/api`), internal packages under `api/internal/` (conf, modules, build, jobs, sessions, server, settings, store, schema).
 - `cli/` — Python `trefoil` CLI, single module `cli/package.py`.
-- `bricks/` — shared bricks (tools, scripts and skills used to build agent images).
+- `modules/` — shared modules (tools, scripts and skills used to build agent images).
 - `examples/` — sample configs, e.g. `examples/echo/`.
 - `backend.yml` — server settings used by `make dev`.
 
-## Building agents and bricks
+## Building agents and modules
 
-Read `bricks/code/trefoil/skills/trefoil-agents/SKILL.md` before writing an
-agent or brick (Claude Code loads it through the `.claude/skills/` symlink;
-trefoil agents get it from the `code:trefoil` brick): prefer shared bricks (`core:os`, `code:github`, ...) over new tools,
-keep bricks generic (a capability, not one agent's part), put programs in their own brick instead of heredocs in a layer script, and
-lay configs out as `trefoil/agents/<name>/` and `trefoil/bricks/<name>/`.
+Read `modules/code/trefoil/skills/trefoil-agents/SKILL.md` before writing an
+agent or module (Claude Code loads it through the `.claude/skills/` symlink;
+trefoil agents get it from the `code:trefoil` module): prefer shared modules (`core:os`, `code:github`, ...) over new tools,
+keep modules generic (a capability, not one agent's part), put programs in their own module instead of heredocs in a layer script, and
+lay configs out as `trefoil/agents/<name>/` and `trefoil/modules/<name>/`.
 
 ## Common tasks
 
 ```sh
 make dev     # run the API with live reload
 make test    # go test ./... in api/
-make test-bricks [BRICKS="core:os code:go"]  # run bricks' tests.py in their images
+make test-modules [MODULES="core:os code:go"]  # run modules' tests.py in their images
 make verify  [EXAMPLES="examples/go"]       # sync + build every example (scripts/verify)
 make cli     # install the trefoil CLI (editable, via uv)
 make seed    # trefoil config sync $(CONFIG)
@@ -46,8 +46,8 @@ Install the CLI with `pip install trefoil-cli` (the command is `trefoil`).
 
 ## API image
 
-`Dockerfile` builds the API server with the shared bricks baked in
-(`BRICKS_DIR=/trefoil/bricks`, `DATA_DIR=/data`). It calls the docker CLI to
+`Dockerfile` builds the API server with the shared modules baked in
+(`MODULES_DIR=/trefoil/modules`, `DATA_DIR=/data`). It calls the docker CLI to
 build and run agents, so mount the host socket:
 `docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock -v trefoil-data:/data ghcr.io/alto-se/trefoil-api`.
 `trefoil engine start` runs that command (`trefoil engine stop` stops it); `--settings FILE` mounts a
@@ -166,7 +166,7 @@ in between, so one noisy command can't overflow the context window.
 ## Artifacts
 
 Tools save files for the user by putting them in `/trefoil/artifacts` in the
-container; the `core:trefoil` brick's `SaveArtifact` tool copies a path there.
+container; the `core:trefoil` module's `SaveArtifact` tool copies a path there.
 Run containers aren't started with `--rm`: when the run ends (even failed or
 timed out) the server `docker cp`s that directory to
 `<data dir>/sessions/<id>/artifacts/`, then removes the container. Stopped run
@@ -185,14 +185,14 @@ with `/opt/odf/bin/python`, so agents also need `core:os`. See
 
 ## Secrets and MCP servers
 
-A brick declares `secrets` (e.g. `github_token: {required: true}`); at run
+A module declares `secrets` (e.g. `github_token: {required: true}`); at run
 time the server sets `GITHUB_TOKEN` in the container from the value stored
 with `POST /secret/github_token` (`{"value": "..."}`, written to
 `<data dir>/secrets/GITHUB_TOKEN`), falling back to `TREFOIL_SECRET_GITHUB_TOKEN`
 in its environment (or `env_file`). A missing required secret rejects the run
-with 422 and `missing_secrets: [...]` before anything starts. A brick's `mcps` are streamable-HTTP MCP
+with 422 and `missing_secrets: [...]` before anything starts. A module's `mcps` are streamable-HTTP MCP
 servers the harness connects to; `credentials` are HTTP headers where
-`${NAME}` expands from the container env. See `bricks/code/github` and
+`${NAME}` expands from the container env. See `modules/code/github` and
 `examples/github`.
 An MCP entry with `sigv4: {service, region}` has its requests SigV4-signed
 with the container's AWS credentials instead; `cloud:aws` uses it for the
@@ -200,41 +200,41 @@ AWS MCP Server (`examples/aws`).
 
 ## Skills
 
-Bricks can carry Agent Skills: folders with a `SKILL.md` (front matter
+Modules can carry Agent Skills: folders with a `SKILL.md` (front matter
 `name`, `description`) plus any files it refers to. Skills ship as zips of
-that folder, listed under `skills:` with `source: !Ref file://skills/<name>.zip`:
-the CLI packager (and the server, for shared bricks) inlines the zip as a
+that folder, listed under `skills:` with `source: !include file://skills/<name>.zip`:
+the CLI packager (and the server, for shared modules) inlines the zip as a
 `data:application/zip;base64,...` string, and `build.Compose` unpacks it into
 the build context (the shallowest SKILL.md marks the folder; `__MACOSX/` and
 dot files are skipped). Edit one by unzipping, changing and
 `zip -rX <name>.zip <name>`. Other sources: `file://some/folder` (packages as
-`{relative path: contents}`, text files only; a shared brick also picks up
+`{relative path: contents}`, text files only; a shared module also picks up
 `skills/<name>/SKILL.md` folders automatically) or `https://...zip` (fetched
 at build time by `harness/skills.py`). `name:` overrides the front matter. Skills are installed at `/trefoil/skills/<name>/`; the harness lists
 them in the system prompt and adds a `Skill` tool (`name`, optional `file`)
 that returns the SKILL.md or another file in the folder. Scripts in a skill
-need a tool such as `core:os` Bash to run. See `bricks/docs/release-notes`,
+need a tool such as `core:os` Bash to run. See `modules/docs/release-notes`,
 `examples/humanizer` (a skill from a GitHub archive zip)
 and `examples/release-notes`.
 
-## Local bricks and split configs
+## Local modules and split configs
 
-Bricks named without a `<namespace>:` prefix are local: defined in the
-config's top-level `bricks:` map, inline or as `!Ref file://bricks/x/config.yml`
+Modules named without a `<namespace>:` prefix are local: defined in the
+config's top-level `modules:` map, inline or as `!include file://modules/x/config.yml`
 (refs in it resolve against its folder, so it can hold `tools.py`, layers
-and skill zips like a shared brick). Any config value can be split into its
-own file with `!Ref` (an agent, `defaults`, a brick). See `examples/local`.
+and skill zips like a shared module). Any config value can be split into its
+own file with `!include` (an agent, `defaults`, a module). See `examples/local`.
 
-## Brick tests
+## Module tests
 
-A shared brick can have a `tests.py` next to its `config.yml`.
-`make test-bricks` (`api/cmd/bricktest`) composes an agent using only that
-brick via `build.Compose`, adds the tests and `api/cmd/bricktest/runner.py`,
-builds the image (`trefoil-bricktest-<ns>-<name>`) and runs the tests in a
+A shared module can have a `tests.py` next to its `config.yml`.
+`make test-modules` (`api/cmd/moduletest`) composes an agent using only that
+module via `build.Compose`, adds the tests and `api/cmd/moduletest/runner.py`,
+builds the image (`trefoil-moduletest-<ns>-<name>`) and runs the tests in a
 container, so they check the real layers and tool code. Tests are plain
 `test_*` functions taking fixtures by name: `tools` (call a tool as
 `tools.Write(path=..., content=...)`, loaded by the harness as in a run) and
 `tmp` (a fresh directory). Raise `unittest.SkipTest` to skip, e.g. when a
 secret is missing; declared secrets are passed in from `NAME` or
 `TREFOIL_SECRET_NAME` in the environment. `-v` shows the docker build output.
-See `bricks/core/os/tests.py`.
+See `modules/core/os/tests.py`.

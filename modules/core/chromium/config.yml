@@ -1,0 +1,41 @@
+name: "Chromium"
+
+skills:
+  - source: https://github.com/endcycles/chrome-browser-skill/archive/refs/heads/main.zip
+
+layers:
+  - title: "Install chromium"
+    description: "Headless Chromium from Debian packages"
+    script: |
+      apt-get update
+      apt-get install -y --no-install-recommends chromium fonts-liberation ca-certificates
+      rm -rf /var/lib/apt/lists/*
+      chromium --version
+
+tools:
+  - name: OpenPage
+    description: "Opens a URL in headless Chromium (JavaScript runs) and returns the page title, its visible text and its links, so you can decide where to navigate next"
+    input_schema:
+      type: object
+      properties:
+        url: { type: string, description: "Absolute http(s) URL to open" }
+      required: [url]
+    command:
+      language: python
+      code:
+        content: !include file://tools.py
+        entry: OpenPage
+
+  - name: PrintPdf
+    description: "Opens a URL in headless Chromium and prints the rendered page to a PDF file"
+    input_schema:
+      type: object
+      properties:
+        url: { type: string, description: "Absolute http(s) URL to print" }
+        path: { type: string, description: "Where to write the PDF, e.g. /workspace/out/page.pdf" }
+      required: [url, path]
+    command:
+      language: python
+      code:
+        content: !include file://tools.py
+        entry: PrintPdf

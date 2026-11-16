@@ -1,6 +1,6 @@
 agents:
   - name: writer
-    bricks:
+    modules:
       - core:os
     input_schema:
       type: object
@@ -9,7 +9,7 @@ agents:
         filename: { type: string }
       required: [topic, filename]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:

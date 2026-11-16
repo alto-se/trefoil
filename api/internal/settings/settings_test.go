@@ -37,7 +37,7 @@ server_port: 9090
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Addr != ":9090" || s.Storage.Local.Path != "/override" || s.BricksDir != filepath.Join(dir, "bricks") {
+	if s.Addr != ":9090" || s.Storage.Local.Path != "/override" || s.ModulesDir != filepath.Join(dir, "modules") {
 		t.Fatalf("settings = %+v", s)
 	}
 	if s.AgentEnv()["AWS_REGION"] != "eu-west-1" || s.LLMProvider[0] != "bedrock" {

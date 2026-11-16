@@ -1,0 +1,29 @@
+name: "Node.js"
+
+layers:
+  - title: "Install Node.js"
+    description: "Node.js LTS from nodejs.org (with npm, npx and corepack), installed into /usr/local"
+    script: |
+      apt-get update
+      apt-get install -y --no-install-recommends ca-certificates curl
+      rm -rf /var/lib/apt/lists/*
+      arch="$(dpkg --print-architecture)"
+      case "$arch" in amd64) arch=x64 ;; esac
+      curl -fsSL "https://nodejs.org/dist/v22.22.2/node-v22.22.2-linux-$arch.tar.gz" | tar -C /usr/local --strip-components=1 -xz
+      node --version
+      npm --version
+
+tools:
+  - name: RunNode
+    description: "Writes a JavaScript file and evaluates it with node, returning the exit code and output"
+    input_schema:
+      type: object
+      properties:
+        path: { type: string, description: "File path to write the script to, e.g. /workspace/out/main.js" }
+        code: { type: string, description: "Full JavaScript source of the script" }
+      required: [path, code]
+    command:
+      language: python
+      code:
+        content: !include file://tools.py
+        entry: RunNode

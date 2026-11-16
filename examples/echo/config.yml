@@ -1,7 +1,7 @@
 agents:
   - name: echo
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:

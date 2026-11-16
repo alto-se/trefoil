@@ -1,6 +1,6 @@
 agents:
   - name: pdf
-    bricks:
+    modules:
       - core:chromium
       - core:trefoil
     input_schema:
@@ -11,7 +11,7 @@ agents:
         filename: { type: string }
       required: [url, goal, filename]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:

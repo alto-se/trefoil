@@ -50,7 +50,7 @@ type agentSummary struct {
 	// harness default.
 	Model       string            `json:"model,omitempty"`
 	Provider    string            `json:"provider,omitempty"`
-	Bricks      []string          `json:"bricks"`
+	Modules     []string          `json:"modules"`
 	Prompts     int               `json:"prompts"`
 	InputSchema *conf.InputSchema `json:"input_schema,omitempty"`
 	Outputs     conf.Fields       `json:"outputs,omitempty"`
@@ -88,7 +88,7 @@ func (s *server) agentSummaries(ctx context.Context, c *conf.Conf) []agentSummar
 			Name:        a.Name,
 			Model:       c.Defaults.Model,
 			Provider:    c.Defaults.Provider,
-			Bricks:      build.AgentBricks(c, a),
+			Modules:     build.AgentModules(c, a),
 			Prompts:     len(a.Prompts),
 			InputSchema: a.InputSchema,
 			Outputs:     a.Outputs,
@@ -450,7 +450,7 @@ func (s *server) readConf(ctx context.Context) (*conf.Conf, int, error) {
 	if err := s.applyProvider(c); err != nil {
 		return nil, http.StatusUnprocessableEntity, err
 	}
-	if err := s.attachSharedBricks(c); err != nil {
+	if err := s.attachSharedModules(c); err != nil {
 		return nil, http.StatusUnprocessableEntity, err
 	}
 	return c, http.StatusOK, nil

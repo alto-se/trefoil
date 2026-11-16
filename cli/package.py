@@ -2,7 +2,7 @@
 """Bundle a trefoil config.yml into a single JSON file.
 
 Resolves:
-  - `!Ref file://path` and `!Ref https://url` tags
+  - `!include file://path` and `!include https://url` tags
   - bare `file://path` strings (bare https:// strings are left as-is)
 
 Referenced .yml/.yaml/.json files are parsed and resolved recursively;
@@ -60,7 +60,8 @@ class Loader(yaml.SafeLoader):
     pass
 
 
-Loader.add_constructor("!Ref", lambda loader, node: Ref(loader.construct_scalar(node)))
+for _tag in ("!include", "!Ref"):  # !Ref is the old name, still accepted
+    Loader.add_constructor(_tag, lambda loader, node: Ref(loader.construct_scalar(node)))
 
 
 class Packager:
@@ -117,7 +118,7 @@ class Packager:
 
 def read_folder(root):
     """Every file under root as {relative path: text}, skipping hidden files
-    and __pycache__, like shared bricks on the server."""
+    and __pycache__, like shared modules on the server."""
     files = {}
     for path in sorted(root.rglob("*")):
         rel = path.relative_to(root)
@@ -507,12 +508,12 @@ def cmd_agents_list(args):
     agents = api_request(args.server, "GET", "/agents")
 
     rows = [
-        (a["name"], a.get("model") or "(default)", a.get("provider") or "anthropic", ", ".join(a["bricks"]),
+        (a["name"], a.get("model") or "(default)", a.get("provider") or "anthropic", ", ".join(a["modules"]),
          format_input_schema(a.get("input_schema")), format_fields(a.get("outputs")), str(a["prompts"]),
          "yes" if a["built"] else "no")
         for a in agents
     ]
-    print_table(("NAME", "MODEL", "PROVIDER", "BRICKS", "INPUT", "OUTPUTS", "PROMPTS", "BUILT"), rows,
+    print_table(("NAME", "MODEL", "PROVIDER", "MODULES", "INPUT", "OUTPUTS", "PROMPTS", "BUILT"), rows,
                 empty="no agents")
 
 
@@ -641,7 +642,7 @@ def main():
             sub.add_argument("-o", "--output", type=Path, metavar="DIR",
                              help="download every artifact into DIR instead of listing them")
 
-    secrets = domain("secrets", "provide secrets that agents' bricks require")
+    secrets = domain("secrets", "provide secrets that agents' modules require")
     secrets_set = secrets.add_parser("set", parents=[server],
                                      help="store a secret on the server (value from a prompt or stdin)")
     secrets_set.add_argument("--name", required=True, metavar="NAME", help="secret name, e.g. github_token")

@@ -4,13 +4,13 @@
 # waits for the checks. When a check fails it reads the log, fixes the code,
 # pushes again and waits again. Tests run in the repo's CI, not locally.
 #
-# The shared code:github brick's MCP server is read-only, so writing to
-# GitHub goes through the local `pulls` brick (REST API, same token). The
+# The shared code:github module's MCP server is read-only, so writing to
+# GitHub goes through the local `pulls` module (REST API, same token). The
 # token needs Contents, Pull requests and Issues write access, plus Checks,
 # Commit statuses and Actions read access.
 agents:
   - name: feature
-    bricks:
+    modules:
       - code:github   # CloneRepo and the read-only GitHub MCP server
       - core:os       # Read, Write, Bash
       - pulls         # local: PushBranch, OpenPullRequest, WaitForChecks
@@ -23,11 +23,11 @@ agents:
         base: { type: string, description: "Branch to open the pull request against; the default branch if empty" }
       required: [repo, id, task]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
-bricks:
-  pulls: !Ref file://bricks/pulls/config.yml
+modules:
+  pulls: !include file://modules/pulls/config.yml
 
 defaults:
   provider: bedrock

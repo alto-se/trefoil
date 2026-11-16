@@ -29,7 +29,7 @@ type agentSpec struct {
 	AWSRegion string        `json:"aws_region,omitempty"`
 	MaxTokens int           `json:"max_tokens,omitempty"`
 	Limits    conf.Limits   `json:"limits,omitzero"`
-	Bricks    []string      `json:"bricks"`
+	Modules   []string      `json:"modules"`
 	Prompts   []conf.Prompt `json:"prompts,omitempty"`
 	// JSON Schemas generated from the agent's input and outputs fields.
 	InputSchema  map[string]any    `json:"input_schema,omitempty"`
@@ -41,7 +41,7 @@ type agentSpec struct {
 }
 
 type toolSpec struct {
-	Brick       string         `json:"brick"`
+	Module      string         `json:"module"`
 	Name        string         `json:"name"`
 	Description string         `json:"description,omitempty"`
 	InputSchema map[string]any `json:"input_schema,omitempty"`
@@ -57,18 +57,18 @@ func ImageTag(name string) string {
 	return "trefoil-agent-" + strings.Trim(unsafeChars.ReplaceAllString(strings.ToLower(name), "-"), "-.") + ":latest"
 }
 
-// AgentBricks returns the bricks an agent's image is built from:
-// defaults.bricks first, then the agent's own, in order, without duplicates.
-func AgentBricks(c *conf.Conf, a *conf.Agent) []string {
-	return uniq(append(append([]string{}, c.Defaults.Bricks...), a.Bricks...))
+// AgentModules returns the modules an agent's image is built from:
+// defaults.modules first, then the agent's own, in order, without duplicates.
+func AgentModules(c *conf.Conf, a *conf.Agent) []string {
+	return uniq(append(append([]string{}, c.Defaults.Modules...), a.Modules...))
 }
 
-// AgentSecrets returns the secrets declared by the bricks an agent uses. A
-// secret is required if any brick requires it.
+// AgentSecrets returns the secrets declared by the modules an agent uses. A
+// secret is required if any module requires it.
 func AgentSecrets(c *conf.Conf, a *conf.Agent) map[string]conf.Secret {
 	out := map[string]conf.Secret{}
-	for _, name := range AgentBricks(c, a) {
-		for k, s := range c.Bricks[name].Secrets {
+	for _, name := range AgentModules(c, a) {
+		for k, s := range c.Modules[name].Secrets {
 			s.Required = s.Required || out[k].Required
 			out[k] = s
 		}
@@ -76,9 +76,9 @@ func AgentSecrets(c *conf.Conf, a *conf.Agent) map[string]conf.Secret {
 	return out
 }
 
-// Compose turns an agent and the bricks it uses into a build context.
+// Compose turns an agent and the modules it uses into a build context.
 func Compose(c *conf.Conf, a *conf.Agent) (*Context, error) {
-	bricks := AgentBricks(c, a)
+	modules := AgentModules(c, a)
 
 	base := c.Defaults.BaseImage
 	if base == "" {
@@ -98,7 +98,7 @@ func Compose(c *conf.Conf, a *conf.Agent) (*Context, error) {
 		AWSRegion: c.Defaults.AWSRegion,
 		MaxTokens: c.Defaults.MaxTokens,
 		Limits:    c.AgentLimits(a),
-		Bricks:    bricks,
+		Modules:   modules,
 		Prompts:   a.Prompts,
 	}
 	if a.InputSchema != nil {
@@ -108,13 +108,13 @@ func Compose(c *conf.Conf, a *conf.Agent) (*Context, error) {
 		spec.OutputSchema = a.Outputs.JSONSchema()
 	}
 	files := map[string][]byte{}
-	skillBricks := map[string]string{} // skill name -> brick, to catch clashes
+	skillModules := map[string]string{} // skill name -> module, to catch clashes
 	var fetches []skillSpec
 
-	for _, name := range bricks {
-		b, ok := c.Bricks[name]
+	for _, name := range modules {
+		b, ok := c.Modules[name]
 		if !ok {
-			return nil, fmt.Errorf("agent %q uses unknown brick %q", a.Name, name)
+			return nil, fmt.Errorf("agent %q uses unknown module %q", a.Name, name)
 		}
 
 		for _, l := range b.Layers {
@@ -126,7 +126,7 @@ func Compose(c *conf.Conf, a *conf.Agent) (*Context, error) {
 			file := path.Join("tools", SafeName(name), SafeName(t.Name)+ext(t.Command.Language))
 			files[file] = []byte(t.Command.Code)
 			spec.Tools = append(spec.Tools, toolSpec{
-				Brick:       name,
+				Module:      name,
 				Name:        t.Name,
 				Description: t.Description,
 				InputSchema: t.InputSchema,
@@ -137,22 +137,22 @@ func Compose(c *conf.Conf, a *conf.Agent) (*Context, error) {
 		}
 		spec.ServerTools = append(spec.ServerTools, b.ServerTools...)
 		for _, s := range b.Skills {
-			sk := skillSpec{Brick: name, Name: s.Name, Source: s.Source}
+			sk := skillSpec{Module: name, Name: s.Name, Source: s.Source}
 			if packagedSkill(s) {
 				sk.Source = ""
 				skillName, skillFiles, err := skillFiles(s)
 				if err != nil {
-					return nil, fmt.Errorf("brick %q: %w", name, err)
+					return nil, fmt.Errorf("module %q: %w", name, err)
 				}
 				maps.Copy(files, skillFiles)
 				sk.Name = skillName
 			} else {
 				fetches = append(fetches, sk)
 			}
-			if other, ok := skillBricks[sk.Name]; ok && sk.Name != "" {
-				return nil, fmt.Errorf("skill %q is in both brick %q and brick %q", sk.Name, other, name)
+			if other, ok := skillModules[sk.Name]; ok && sk.Name != "" {
+				return nil, fmt.Errorf("skill %q is in both module %q and module %q", sk.Name, other, name)
 			}
-			skillBricks[sk.Name] = name
+			skillModules[sk.Name] = name
 			spec.Skills = append(spec.Skills, sk)
 		}
 		spec.MCPs = append(spec.MCPs, b.MCPs...)
@@ -223,7 +223,7 @@ func writeRun(df *strings.Builder, script string) {
 
 func uniq(names []string) []string {
 	seen := map[string]bool{}
-	// Non-nil so an agent without bricks encodes as [] rather than null.
+	// Non-nil so an agent without modules encodes as [] rather than null.
 	out := []string{}
 	for _, n := range names {
 		if !seen[n] {

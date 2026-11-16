@@ -1,6 +1,6 @@
 agents:
   - name: node
-    bricks:
+    modules:
       - code:node
     input_schema:
       type: object
@@ -9,7 +9,7 @@ agents:
         filename: { type: string }
       required: [task, filename]
     prompts:
-      - source: !Ref file://prompt.md
+      - source: !include file://prompt.md
         role: system
 
 defaults:

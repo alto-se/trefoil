@@ -1,4 +1,4 @@
 {
-  "text": "Their are many reasons to use trefoil. It let's you build agents from bricks, and the the bricks can be shared or local. In order to get started you basically just need a config file, which is very easy to write, and a server, wich runs the agents in containers that are built from the bricks you have listed.",
+  "text": "Their are many reasons to use trefoil. It let's you build agents from modules, and the the modules can be shared or local. In order to get started you basically just need a config file, which is very easy to write, and a server, wich runs the agents in containers that are built from the modules you have listed.",
   "filename": "report.md"
 }
