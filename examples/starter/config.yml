@@ -1,0 +1,39 @@
+# The default `trefoil init` project: one agent, laid out the way a real
+# project keeps its trefoil config (see the trefoil-agents skill).
+#
+#   config.yml                    params, defaults, which agents and modules
+#   agents/briefing/              the agent: its config and prompt
+#   modules/reports/              a local module carrying a skill
+#
+# Values the user sets once go in `params`, declared like an input_schema.
+# Set one with `trefoil params set --name=audience "product managers"`; a run
+# that leaves out its `audience` input gets the param's value (or the default).
+params:
+  type: object
+  properties:
+    audience:
+      type: string
+      description: "Who the briefings are written for"
+      default: "software engineers"
+
+agents:
+  - !include file://agents/briefing/config.yml
+
+# Modules without a "<namespace>:" prefix are local, defined here. Shared ones
+# (core:os, core:trefoil, ...) come from the server's modules/ folder.
+modules:
+  reports: !include file://modules/reports/config.yml
+
+# Settings every agent inherits unless it sets its own.
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 8000
+  modules:
+    - core:os        # Read, Write, Bash
+    - core:trefoil   # SaveArtifact: files the user downloads after the run
+  limits:
+    max_turns: 12
+    timeout_seconds: 300
+    max_cost_usd: 0.50

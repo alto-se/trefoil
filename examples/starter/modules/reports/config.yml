@@ -1,0 +1,8 @@
+name: "Reports"
+
+# A skill is a folder with a SKILL.md and any files it refers to. Listed as a
+# folder, the CLI packages its text files into the config; the harness
+# installs it at /trefoil/skills/report/ and gives the agent a Skill tool to
+# read it. Its script runs through core:os Bash, so no tool code is needed.
+skills:
+  - source: !include file://skills/report

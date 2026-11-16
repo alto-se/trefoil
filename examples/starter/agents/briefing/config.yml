@@ -1,0 +1,15 @@
+# One agent per folder; refs resolve against this folder, so the prompt sits
+# next to it. Modules listed here add to the ones in `defaults`.
+name: briefing
+modules:
+  - reports
+input_schema:
+  type: object
+  properties:
+    topic: { type: string, description: "What the briefing is about" }
+    audience: { type: string, description: "Who it's for (defaults to the audience param)" }
+    words: { type: integer, description: "Word limit for the body", default: 300 }
+  required: [topic]
+prompts:
+  - source: !include file://prompt.md
+    role: system
