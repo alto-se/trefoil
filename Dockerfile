@@ -11,12 +11,15 @@
 # Mount a backend.yml and set TREFOIL_SETTINGS to configure it further;
 # ADDR, DATA_DIR and MODULES_DIR still override it.
 
-FROM golang:1.24-alpine AS build
+# Built for linux/amd64 and linux/arm64: Go cross-compiles on the build host
+# and the final stage only copies files, so no emulation is needed.
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS build
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY api/go.mod api/go.sum ./
 RUN go mod download
 COPY api/ ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
 FROM docker:27-cli
 COPY --from=build /out/api /usr/local/bin/trefoil-api
