@@ -34,7 +34,8 @@ make seed    # trefoil config sync $(CONFIG)
 Pushes to `main` are released by `.github/workflows/release.yml`:
 semantic-release (config in `.releaserc.json`) derives the version from
 conventional commits since the last `v*` tag (`fix:` bumps patch, `feat:`
-bumps minor, `feat!:` or `BREAKING CHANGE:` bumps major; other types such as
+bumps minor, and while pre-1.0 `feat!:` or `BREAKING CHANGE:` also bumps
+minor (a `releaseRules` cap in `.releaserc.json`; drop it to go 1.0); other types such as
 `chore:` and `docs:` release nothing), commits `VERSION` and
 `cli/pyproject.toml` back to `main` and tags `v<version>`. Then, from that
 tag, the CLI is published to PyPI as `trefoil-cli` (trusted publishing) and
