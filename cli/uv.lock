@@ -67,8 +67,8 @@ wheels = [
 ]
 
 [[package]]
-name = "trefoil"
-version = "0.1.0"
+name = "trefoil-cli"
+version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },

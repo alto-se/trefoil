@@ -10,6 +10,14 @@ Notes for coding agents working in this repo.
 - `examples/` — sample configs, e.g. `examples/echo/`.
 - `backend.yml` — server settings used by `make dev`.
 
+## Building agents and bricks
+
+Read `bricks/code/trefoil/skills/trefoil-agents/SKILL.md` before writing an
+agent or brick (Claude Code loads it through the `.claude/skills/` symlink;
+trefoil agents get it from the `code:trefoil` brick): prefer shared bricks (`core:os`, `code:github`, ...) over new tools,
+keep bricks generic (a capability, not one agent's part), put programs in their own brick instead of heredocs in a layer script, and
+lay configs out as `trefoil/agents/<name>/` and `trefoil/bricks/<name>/`.
+
 ## Common tasks
 
 ```sh
@@ -20,6 +28,14 @@ make verify  [EXAMPLES="examples/go"]       # sync + build every example (script
 make cli     # install the trefoil CLI (editable, via uv)
 make seed    # trefoil config sync $(CONFIG)
 ```
+
+## CLI releases
+
+Every push to `main` publishes the CLI to PyPI as `trefoil-cli`
+(`.github/workflows/publish-cli.yml`, PyPI trusted publishing). The version
+is `MAJOR.MINOR` from `VERSION` plus the workflow run number as patch, and
+the commit is tagged `cli-v<version>`; bump `VERSION` for a new minor or
+major. Install with `pip install trefoil-cli` (the command is `trefoil`).
 
 ## CLI shape
 
@@ -34,13 +50,14 @@ trefoil config sync [path/to/config.yml]
 
 trefoil agents list
 trefoil agents build --agent=echo [-d] [--dockerfile]
-trefoil agents context --agent=echo [-o FILE]       # build context as a zip
+trefoil agents get-bundle --agent=echo [-o FILE]       # build context as a zip
 trefoil agents run --agent=echo --input=file://input.json [-d]
 trefoil agents run --agent=echo "task text"        # or pipe the task on stdin
 
 trefoil sessions status --agent=echo SESSION_ID
 trefoil sessions logs   --agent=echo SESSION_ID [-f] [-o FILE]
 trefoil sessions result --agent=echo SESSION_ID
+trefoil sessions stop   --agent=echo SESSION_ID
 trefoil sessions artifacts --agent=pdf SESSION_ID [-o DIR]
 
 trefoil secrets set --name=github_token          # value from prompt or stdin
@@ -97,8 +114,16 @@ with "interrupted by server restart".
 stored config (as a build would) and sends it as `<agent>-context.zip`: the
 Dockerfile and every file it copies under one `<agent>/` folder, so
 `unzip` then `docker build <agent>` builds the same image outside the
-server. `trefoil agents context --agent=NAME [-o FILE]` saves it, and the
+server. `trefoil agents get-bundle --agent=NAME [-o FILE]` saves it, and the
 dashboard's agent page links to it.
+
+## Stopping runs
+
+`POST /agents/{name}/sessions/{id}/stop` (`trefoil sessions stop`, or the
+Stop button on the dashboard's run page) cancels the run's context, which
+`docker kill`s its container; artifacts are still collected. The session
+finishes as `failed` with error `stopped` and a `[trefoil] run stopped by
+request` line in its logs. Stopping a session that isn't running is a 409.
 
 ## Run timeline events
 

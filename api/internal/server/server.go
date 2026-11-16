@@ -78,6 +78,7 @@ func New(logger *slog.Logger, st store.Store, v *schema.Validator, d build.Docke
 	mux.HandleFunc("POST /agents/{a}/{b}", s.handleAgentAction)
 	mux.HandleFunc("GET /agents/{name}/context", s.handleAgentContext)
 	mux.HandleFunc("GET /agents/{name}/sessions/{id}/status", s.handleSessionStatus)
+	mux.HandleFunc("POST /agents/{name}/sessions/{id}/stop", s.handleSessionStop)
 	mux.HandleFunc("GET /agents/{name}/sessions/{id}/logs", s.handleSessionLogs)
 	mux.HandleFunc("GET /agents/{name}/sessions/{id}/events", s.handleSessionEvents)
 	mux.HandleFunc("GET /agents/{name}/sessions/{id}/result", s.handleSessionResult)

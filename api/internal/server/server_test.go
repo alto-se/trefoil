@@ -37,6 +37,8 @@ type fakeDocker struct {
 	logs    string // extra stderr Run writes after its first line
 	// artifacts are files Run leaves in opts.Artifacts, by relative path.
 	artifacts map[string]string
+	// hold makes Run wait for its context to end, like a run being stopped.
+	hold bool
 }
 
 func (f *fakeDocker) Build(ctx context.Context, bc *build.Context, dir, tag string, logs io.Writer) error {
@@ -48,6 +50,13 @@ func (f *fakeDocker) Build(ctx context.Context, bc *build.Context, dir, tag stri
 }
 
 func (f *fakeDocker) Run(ctx context.Context, tag string, stdin []byte, opts build.RunOptions) (*build.RunResult, error) {
+	f.mu.Lock()
+	hold := f.hold
+	f.mu.Unlock()
+	if hold {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.built[tag] == nil {
@@ -498,6 +507,42 @@ func TestRunPassesLimits(t *testing.T) {
 	bad := `{"bricks":{},"agents":[{"name":"a","limits":{"max_turns":0}}]}`
 	if rec := do(h, http.MethodPost, "/conf", bad); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid limits: status = %d, want 422", rec.Code)
+	}
+}
+
+func TestStopRun(t *testing.T) {
+	h, d := newTestHandlerWithDocker(t)
+	if rec := do(h, http.MethodPost, "/conf", `{"bricks":{},"agents":[{"name":"a"}]}`); rec.Code != http.StatusCreated {
+		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	buildAndWait(t, h, "/agents/a/build")
+	d.mu.Lock()
+	d.hold = true
+	d.mu.Unlock()
+	rec := do(h, http.MethodPost, "/agents/a/run", "go")
+	var started map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &started)
+	base := "/agents/a/sessions/" + started["session_id"].(string)
+
+	if rec := do(h, http.MethodPost, "/agents/b/sessions/"+started["session_id"].(string)+"/stop", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("stop under another agent: status = %d, want 404", rec.Code)
+	}
+	if rec := do(h, http.MethodPost, base+"/stop", ""); rec.Code != http.StatusAccepted {
+		t.Fatalf("stop: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	var status map[string]any
+	for i := 0; i < 200; i++ {
+		_ = json.Unmarshal(do(h, http.MethodGet, base+"/status", "").Body.Bytes(), &status)
+		if status["status"] != "running" {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if status["status"] != "failed" || status["error"] != "stopped" {
+		t.Fatalf("status after stop = %v", status)
+	}
+	if rec := do(h, http.MethodPost, base+"/stop", ""); rec.Code != http.StatusConflict {
+		t.Fatalf("second stop: status = %d, want 409", rec.Code)
 	}
 }
 

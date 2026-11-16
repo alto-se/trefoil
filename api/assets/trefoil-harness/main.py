@@ -475,12 +475,21 @@ def cap_output(output, limit=TOOL_OUTPUT_MAX):
             "and read or grep the parts you need …]\n\n" + output[-half:])
 
 
+def summarize_output(output):
+    """The text of a tool result for logs and events, with images as placeholders."""
+    if isinstance(output, str):
+        return output
+    return "\n".join(b["text"] if b.get("type") == "text" else f"[{b.get('type')}]" for b in output)
+
+
 def run_tool(handlers, block):
     handler = handlers.get(block.name)
     if handler is None:
         return f"Error: unknown tool {block.name!r}", True
     try:
-        return str(handler(SimpleNamespace(**block.input))), False
+        output = handler(SimpleNamespace(**block.input))
+        # A list is content blocks (text and images); anything else is text.
+        return (output if isinstance(output, list) else str(output)), False
     except ToolError as e:
         return f"Error: {e}", True
     except Exception:
@@ -578,11 +587,17 @@ def main():
             event("tool_call", turn=turn, id=block.id, tool=block.name, input=block.input)
             started = time.monotonic()
             output, is_error = run_tool(handlers, block)
-            if len(output) > TOOL_OUTPUT_MAX:
-                log(f"turn {turn}: {block.name} output cut from {len(output):,} to {TOOL_OUTPUT_MAX:,} chars")
-                output = cap_output(output)
+            texts = [output] if isinstance(output, str) else [b for b in output if b.get("type") == "text"]
+            for text in texts:
+                value = text if isinstance(text, str) else text["text"]
+                if len(value) > TOOL_OUTPUT_MAX:
+                    log(f"turn {turn}: {block.name} output cut from {len(value):,} to {TOOL_OUTPUT_MAX:,} chars")
+                    if isinstance(text, str):
+                        output = cap_output(value)
+                    else:
+                        text["text"] = cap_output(value)
             event("tool_result", turn=turn, id=block.id, tool=block.name, is_error=is_error,
-                  ms=round((time.monotonic() - started) * 1000), output=output)
+                  ms=round((time.monotonic() - started) * 1000), output=summarize_output(output))
             results.append({"type": "tool_result", "tool_use_id": block.id, "content": output, "is_error": is_error})
         messages.append({"role": "user", "content": results})
 
