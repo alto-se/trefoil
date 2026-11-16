@@ -54,7 +54,8 @@ Install the CLI with `pip install trefoil-cli` (the command is `trefoil`).
 (`MODULES_DIR=/trefoil/modules`, `DATA_DIR=/data`). It calls the docker CLI to
 build and run agents, so mount the host socket:
 `docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock -v trefoil-data:/data ghcr.io/alto-se/trefoil-api`.
-`trefoil engine start` runs that command (`trefoil engine stop` stops it); `--settings FILE` mounts a
+`trefoil engine start` runs that command with the image tag matching the CLI's
+version (`:latest` if unknown; `--image` overrides), and `trefoil engine stop` stops it; `--settings FILE` mounts a
 backend.yml read-only (plus its `env_file`) and sets `TREFOIL_SETTINGS`.
 `ADDR`/`DATA_DIR` in the image still win over the file's port and storage path.
 `--provider bedrock|anthropic` picks the LLM backend (sets `LLM_PROVIDER`,

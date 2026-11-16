@@ -53,7 +53,7 @@ import yaml
 
 DEFAULT_SERVER = "http://localhost:8080"
 EXAMPLES_API = "https://api.github.com/repos/alto-se/trefoil/contents/examples"
-ENGINE_IMAGE = "ghcr.io/alto-se/trefoil-api:latest"
+ENGINE_REPO = "ghcr.io/alto-se/trefoil-api"
 
 
 class Ref:
@@ -722,6 +722,12 @@ def cli_version():
         return "unknown"
 
 
+def engine_image():
+    """The API image released with this CLI (same version), or :latest when unknown."""
+    version = cli_version()
+    return f"{ENGINE_REPO}:{'latest' if version == 'unknown' else version}"
+
+
 def main():
     parser = argparse.ArgumentParser(prog="trefoil", description="trefoil <domain> <command> [args]")
     parser.add_argument("--version", action="version", version=f"%(prog)s {cli_version()}")
@@ -761,7 +767,7 @@ def main():
     engine_start.add_argument("--aws-region", metavar="REGION",
                                help="AWS region for bedrock (default: $AWS_REGION or the profile's region)")
     engine_start.add_argument("--port", type=int, default=8080, help="host port to publish (default: 8080)")
-    engine_start.add_argument("--image", default=ENGINE_IMAGE, help=f"API image (default: {ENGINE_IMAGE})")
+    engine_start.add_argument("--image", default=engine_image(), help=f"API image (default: {engine_image()})")
     engine_start.add_argument("--name", default="trefoil-api", help="container name (default: trefoil-api)")
     engine_start.add_argument("--volume", default="trefoil-data",
                                help="docker volume (or host path) for the data dir (default: trefoil-data)")
