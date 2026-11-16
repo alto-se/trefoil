@@ -49,6 +49,9 @@ Install the CLI with `pip install trefoil-cli` (the command is `trefoil`).
 (`BRICKS_DIR=/trefoil/bricks`, `DATA_DIR=/data`). It calls the docker CLI to
 build and run agents, so mount the host socket:
 `docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock -v trefoil-data:/data ghcr.io/alto-se/trefoil-api`.
+`trefoil start-backend` runs that command; `--settings FILE` mounts a
+backend.yml read-only (plus its `env_file`) and sets `TREFOIL_SETTINGS`.
+`ADDR`/`DATA_DIR` in the image still win over the file's port and storage path.
 
 ## CLI shape
 
@@ -60,6 +63,7 @@ after the command.
 ```sh
 trefoil --version
 trefoil update                     # reinstall the latest trefoil-cli via pip (or uv)
+trefoil start-backend [--settings=backend.yml] [--port=8080] [-d]  # docker run the API image
 trefoil config package path/to/config.yml [-o bundle.json]
 trefoil config sync [path/to/config.yml]
 

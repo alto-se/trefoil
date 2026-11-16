@@ -15,6 +15,7 @@ Usage: trefoil <domain> <command> [args]
 
   trefoil init [DIR] [--example=NAME]
   trefoil update
+  trefoil start-backend [--settings=backend.yml] [--port=8080] [-d]
   trefoil config package path/to/config.yml [-o bundle.json]
   trefoil config sync [path/to/config.yml] [--server URL]
   trefoil agents list
@@ -195,6 +196,36 @@ def cmd_update(args):
     else:
         sys.exit("trefoil: neither pip nor uv is available to reinstall trefoil-cli")
     print(f"trefoil {cli_version()}: {' '.join(cmd)}", file=sys.stderr)
+    sys.exit(subprocess.run(cmd).returncode)
+
+
+def cmd_start_backend(args):
+    if not shutil.which("docker"):
+        sys.exit("trefoil: docker is not installed or not on PATH")
+    cmd = ["docker", "run", "--rm", "--name", args.name, "-p", f"{args.port}:8080",
+           "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", f"{args.volume}:/data"]
+    if args.settings:
+        path = args.settings.resolve()
+        if not path.is_file():
+            sys.exit(f"trefoil: {args.settings} is not a file")
+        mount = f"/trefoil/settings/{path.name}"
+        cmd += ["-v", f"{path}:{mount}:ro", "-e", f"TREFOIL_SETTINGS={mount}"]
+        # The server resolves env_file against the settings file and fails if
+        # it's missing, so mount it where it will look.
+        try:
+            env_file = (yaml.safe_load(path.read_text()) or {}).get("env_file")
+        except (yaml.YAMLError, AttributeError) as e:
+            sys.exit(f"trefoil: {args.settings}: {e}")
+        if env_file:
+            host = (path.parent / env_file).resolve()
+            if not host.is_file():
+                sys.exit(f"trefoil: env_file {host} (from {args.settings}) not found")
+            target = env_file if os.path.isabs(env_file) else os.path.normpath(f"/trefoil/settings/{env_file}")
+            cmd += ["-v", f"{host}:{target}:ro"]
+    if args.detach:
+        cmd.append("-d")
+    cmd.append(args.image)
+    print(f"trefoil: {' '.join(cmd)}", file=sys.stderr)
     sys.exit(subprocess.run(cmd).returncode)
 
 
@@ -532,6 +563,18 @@ def main():
 
     update = domains.add_parser("update", help="reinstall the latest trefoil-cli from PyPI")
     update.set_defaults(func=cmd_update)
+
+    start_backend = domains.add_parser("start-backend", help="run the trefoil API server image locally with docker")
+    start_backend.add_argument("--settings", type=Path, metavar="FILE",
+                               help="backend settings file (backend.yml) to mount into the container")
+    start_backend.add_argument("--port", type=int, default=8080, help="host port to publish (default: 8080)")
+    start_backend.add_argument("--image", default="ghcr.io/alto-se/trefoil-api:latest",
+                               help="API image (default: ghcr.io/alto-se/trefoil-api:latest)")
+    start_backend.add_argument("--name", default="trefoil-api", help="container name (default: trefoil-api)")
+    start_backend.add_argument("--volume", default="trefoil-data",
+                               help="docker volume (or host path) for the data dir (default: trefoil-data)")
+    start_backend.add_argument("-d", "--detach", action="store_true", help="run in the background")
+    start_backend.set_defaults(func=cmd_start_backend)
 
     config = domain("config", "package and upload agent configs")
     package = config.add_parser("package", help=__doc__.splitlines()[0])
