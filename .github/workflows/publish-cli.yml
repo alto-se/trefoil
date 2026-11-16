@@ -1,7 +1,10 @@
-# Publishes the trefoil CLI (cli/) to PyPI as trefoil-cli on every push to main.
+# Releases and publishes the trefoil CLI (cli/) to PyPI as trefoil-cli.
 #
-# Version: MAJOR.MINOR from the VERSION file, PATCH = this workflow's run number,
-# so every push gets a new, increasing version. Bump VERSION for a new minor/major.
+# Version: semantic-release reads conventional commits since the last cli-v* tag
+# (fix: -> patch, feat: -> minor, feat!: / BREAKING CHANGE -> major), writes the
+# new version to VERSION and cli/pyproject.toml, commits it back to main, tags
+# cli-v<version> and creates a GitHub release. Config lives in .releaserc.json.
+# Pushes with no releasable commits (chore:, docs:, ...) publish nothing.
 #
 # Uses PyPI trusted publishing (no API token): add a publisher for project
 # "trefoil-cli", repo alto-se/trefoil, workflow publish-cli.yml, environment pypi.
@@ -17,23 +20,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      published: ${{ steps.semrel.outputs.new_release_published }}
+      version: ${{ steps.semrel.outputs.new_release_version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: semrel
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            @semantic-release/exec
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cli-v${{ needs.release.outputs.version }}
 
       - uses: astral-sh/setup-uv@v6
 
-      - id: version
-        name: Compute version
-        run: |
-          base=$(tr -d '[:space:]' < VERSION)
-          version="$(echo "$base" | cut -d. -f1-2).${GITHUB_RUN_NUMBER}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          sed -i "s/^version = .*/version = \"$version\"/" cli/pyproject.toml
-          grep '^version' cli/pyproject.toml
+      - name: Check version
+        run: grep -x 'version = "${{ needs.release.outputs.version }}"' cli/pyproject.toml
 
       - name: Build
         working-directory: cli
@@ -51,14 +73,13 @@ jobs:
           path: dist/
 
   publish:
-    needs: build
+    needs: [release, build]
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/trefoil-cli/${{ needs.build.outputs.version }}/
+      url: https://pypi.org/project/trefoil-cli/${{ needs.release.outputs.version }}/
     permissions:
       id-token: write
-      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -66,11 +87,3 @@ jobs:
           path: dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
-
-      - name: Tag release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
-            -f ref="refs/tags/cli-v${{ needs.build.outputs.version }}" \
-            -f sha="${GITHUB_SHA}"

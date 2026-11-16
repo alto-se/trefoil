@@ -47,7 +47,8 @@ config-driven workflow:
 - **Bricks.** Reusable building blocks of tools, scripts, image layers, skills,
   secrets and MCP servers. Compose an agent from shared bricks
   (`core:os`, `code:github`, `docs:opendoc`, ...) or define local ones next to
-  your config. The name comes from *bricolage*, not bricks in a wall.
+  your config. The name comes from *bricolage*, not bricks like a house.
+  Really funny joke I know. Took me several prompts to find a good word for it.
 - **Built-in harness.** Every agent image ships with the trefoil harness: the
   agent loop, tool dispatch, Agent Skills, MCP clients and a timeline of
   events (model calls, tool calls, results, limits).

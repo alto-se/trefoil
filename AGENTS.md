@@ -31,11 +31,15 @@ make seed    # trefoil config sync $(CONFIG)
 
 ## CLI releases
 
-Every push to `main` publishes the CLI to PyPI as `trefoil-cli`
-(`.github/workflows/publish-cli.yml`, PyPI trusted publishing). The version
-is `MAJOR.MINOR` from `VERSION` plus the workflow run number as patch, and
-the commit is tagged `cli-v<version>`; bump `VERSION` for a new minor or
-major. Install with `pip install trefoil-cli` (the command is `trefoil`).
+Pushes to `main` are released with semantic-release
+(`.github/workflows/publish-cli.yml`, config in `.releaserc.json`) and
+published to PyPI as `trefoil-cli` (PyPI trusted publishing). The version is
+derived from conventional commits since the last `cli-v*` tag: `fix:` bumps
+patch, `feat:` bumps minor, `feat!:` or `BREAKING CHANGE:` bumps major; other
+types (`chore:`, `docs:`, ...) release nothing. The release commit updates
+`VERSION` and `cli/pyproject.toml` and is tagged `cli-v<version>`; never edit
+the version by hand. Install with `pip install trefoil-cli` (the command is
+`trefoil`).
 
 ## CLI shape
 
