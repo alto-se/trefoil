@@ -39,6 +39,7 @@ func (s *server) registerUI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ui/agents", s.handleUIAgents)
 	mux.HandleFunc("GET /ui/jobs", s.handleUIJobs)
 	mux.HandleFunc("GET /ui/jobs/{id}", s.handleUIJob)
+	mux.HandleFunc("POST /ui/jobs/{id}/rerun", s.handleUIJobRerun)
 	mux.HandleFunc("GET /ui/agents/{name}", s.handleUIAgent)
 	mux.HandleFunc("GET /ui/agents/{name}/run", s.handleUIRunForm)
 	mux.HandleFunc("POST /ui/agents/{name}/run", s.handleUIRun)
@@ -178,6 +179,27 @@ func (s *server) handleUIJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "job not found", http.StatusNotFound)
 		return
 	}
+	s.render(w, "job.html", j.Snapshot())
+}
+
+// handleUIJobRerun builds the job's agent again and swaps the new job into
+// the details pane. Errors come back as text for the job's Rerun button to
+// show next to it.
+func (s *server) handleUIJobRerun(w http.ResponseWriter, r *http.Request) {
+	old, ok := s.jobs.Get(r.PathValue("id"))
+	if !ok {
+		http.Error(w, "job not found", http.StatusNotFound)
+		return
+	}
+	j, _, err := s.rerunJob(r.Context(), old)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprint(w, err.Error())
+		return
+	}
+	w.Header().Set("HX-Trigger", "refresh")
+	w.Header().Set("HX-Retarget", "#detail")
+	w.Header().Set("HX-Reswap", "innerHTML")
 	s.render(w, "job.html", j.Snapshot())
 }
 

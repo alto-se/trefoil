@@ -175,6 +175,11 @@
   .run-head > .rerun-error:empty { display: none; }
   .run-head > .rerun-error:not(:empty) + button { margin-left: 0; }
   .run-head > button.rerun:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .detail h3 > .rerun-error { margin-left: auto; font-size: 13px; font-weight: 400; }
+  .detail h3 > .rerun-error:empty { display: none; }
+  .detail h3 > button.rerun { margin-left: auto; font-size: 13px; }
+  .detail h3 > .rerun-error:not(:empty) + button { margin-left: 0; }
+  .detail h3 > button.rerun:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   .run > dl { padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
   .run-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .run-side { display: flex; flex-direction: column; gap: 20px; }

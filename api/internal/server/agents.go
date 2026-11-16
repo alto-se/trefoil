@@ -102,19 +102,58 @@ func (s *server) agentSummaries(ctx context.Context, c *conf.Conf) []agentSummar
 }
 
 func (s *server) buildAgent(w http.ResponseWriter, r *http.Request, name string) {
-	c, ok := s.loadConf(w, r)
-	if !ok {
+	job, status, err := s.startBuild(r.Context(), name)
+	if err != nil {
+		writeError(w, status, err.Error())
 		return
+	}
+	writeJSON(w, http.StatusAccepted, job.Snapshot())
+}
+
+// handleJobRerun starts a new build of the job's agent. Like a fresh build,
+// it uses the current config, so changes synced since the job are picked up.
+func (s *server) handleJobRerun(w http.ResponseWriter, r *http.Request) {
+	old, ok := s.jobs.Get(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+	job, status, err := s.rerunJob(r.Context(), old)
+	if err != nil {
+		writeError(w, status, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, job.Snapshot())
+}
+
+// rerunJob builds old's agent again. On error it also returns the HTTP
+// status that fits it.
+func (s *server) rerunJob(ctx context.Context, old *jobs.Job) (*jobs.Job, int, error) {
+	snap := old.Snapshot()
+	if snap.Kind != "build" {
+		return nil, http.StatusConflict, fmt.Errorf("can't rerun a %q job", snap.Kind)
+	}
+	if snap.Status == jobs.Queued || snap.Status == jobs.Running {
+		return nil, http.StatusConflict, errors.New("job is still " + string(snap.Status))
+	}
+	return s.startBuild(ctx, snap.Agent)
+}
+
+// startBuild composes the agent's build context from the stored config and
+// builds its image in a background job. On error it also returns the HTTP
+// status that fits it.
+func (s *server) startBuild(ctx context.Context, name string) (*jobs.Job, int, error) {
+	c, status, err := s.readConf(ctx)
+	if err != nil {
+		return nil, status, err
 	}
 	agent, err := c.Agent(name)
 	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
-		return
+		return nil, http.StatusNotFound, err
 	}
 	bc, err := build.Compose(c, agent)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
-		return
+		return nil, http.StatusUnprocessableEntity, err
 	}
 
 	// The build outlives the request, so it gets its own context.
@@ -133,7 +172,7 @@ func (s *server) buildAgent(w http.ResponseWriter, r *http.Request, name string)
 		}
 		return err
 	})
-	writeJSON(w, http.StatusAccepted, job.Snapshot())
+	return job, 0, nil
 }
 
 // handleAgentContext sends the agent's build context (the Dockerfile plus

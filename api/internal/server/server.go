@@ -74,6 +74,7 @@ func New(logger *slog.Logger, st store.Store, v *schema.Validator, d build.Docke
 	mux.HandleFunc("DELETE /param/{name}", s.handleDeleteParam)
 	mux.HandleFunc("GET /jobs", s.handleListJobs)
 	mux.HandleFunc("GET /jobs/{id}", s.handleGetJob)
+	mux.HandleFunc("POST /jobs/{id}/rerun", s.handleJobRerun)
 	// One pattern serves /agents/{id}/build, /agents/{id}/run and the
 	// /agents/build/{id} alias; separate patterns would conflict in ServeMux.
 	mux.HandleFunc("POST /agents/{a}/{b}", s.handleAgentAction)

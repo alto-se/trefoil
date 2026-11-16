@@ -1,5 +1,6 @@
 <div class="detail" {{if or (eq .Status "running") (eq .Status "queued")}}hx-get="/ui/jobs/{{.ID}}" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>
-  <h3>Build {{.Agent}} <span class="pill {{.Status}}">{{.Status}}</span></h3>
+  <h3>Build {{.Agent}} <span class="pill {{.Status}}">{{.Status}}</span>
+    {{if and (eq .Kind "build") (ne .Status "running") (ne .Status "queued")}}<span class="failed rerun-error" id="rerun-error-{{.ID}}"></span><button class="rerun" hx-post="/ui/jobs/{{.ID}}/rerun" hx-target="#rerun-error-{{.ID}}" title="Build {{.Agent}} again from the current config">Rerun</button>{{end}}</h3>
   <dl>
     <dt>Job</dt><dd class="mono">{{.ID}}</dd>
     <dt>Image</dt><dd class="mono">{{.Image}}</dd>
