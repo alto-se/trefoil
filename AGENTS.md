@@ -29,17 +29,19 @@ make cli     # install the trefoil CLI (editable, via uv)
 make seed    # trefoil config sync $(CONFIG)
 ```
 
-## CLI releases
+## Releases
 
-Pushes to `main` are released with semantic-release
-(`.github/workflows/publish-cli.yml`, config in `.releaserc.json`) and
-published to PyPI as `trefoil-cli` (PyPI trusted publishing). The version is
-derived from conventional commits since the last `cli-v*` tag: `fix:` bumps
-patch, `feat:` bumps minor, `feat!:` or `BREAKING CHANGE:` bumps major; other
-types (`chore:`, `docs:`, ...) release nothing. The release commit updates
-`VERSION` and `cli/pyproject.toml` and is tagged `cli-v<version>`; never edit
-the version by hand. Install with `pip install trefoil-cli` (the command is
-`trefoil`).
+Pushes to `main` are released by `.github/workflows/release.yml`:
+semantic-release (config in `.releaserc.json`) derives the version from
+conventional commits since the last `v*` tag (`fix:` bumps patch, `feat:`
+bumps minor, `feat!:` or `BREAKING CHANGE:` bumps major; other types such as
+`chore:` and `docs:` release nothing), commits `VERSION` and
+`cli/pyproject.toml` back to `main` and tags `v<version>`. Then, from that
+tag, the CLI is published to PyPI as `trefoil-cli` (trusted publishing) and
+the API image to `ghcr.io/alto-se/trefoil-api:<version>`, `:<major>.<minor>`
+and `:latest`. Never edit the version by hand. Pull requests run
+`.github/workflows/ci.yml` (`go test`, image build, CLI build and smoke test).
+Install the CLI with `pip install trefoil-cli` (the command is `trefoil`).
 
 ## API image
 
@@ -47,9 +49,6 @@ the version by hand. Install with `pip install trefoil-cli` (the command is
 (`BRICKS_DIR=/trefoil/bricks`, `DATA_DIR=/data`). It calls the docker CLI to
 build and run agents, so mount the host socket:
 `docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock -v trefoil-data:/data ghcr.io/alto-se/trefoil-api`.
-`.github/workflows/publish-api.yml` runs `go test` and builds it on PRs, and
-on pushes to `main` publishes `ghcr.io/alto-se/trefoil-api:latest` and
-`:sha-<short sha>`.
 
 ## CLI shape
 
@@ -60,6 +59,7 @@ after the command.
 
 ```sh
 trefoil --version
+trefoil update                     # reinstall the latest trefoil-cli via pip (or uv)
 trefoil config package path/to/config.yml [-o bundle.json]
 trefoil config sync [path/to/config.yml]
 

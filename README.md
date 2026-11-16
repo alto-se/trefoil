@@ -96,6 +96,7 @@ Server settings (port, AWS region, providers, data dir, `.env` file) are in
 
 ```sh
 trefoil init [DIR] [--example=NAME]   # scaffold from examples/ on GitHub (default: echo)
+trefoil update                        # reinstall the latest trefoil-cli from PyPI
 trefoil agents list
 trefoil agents build   --agent=NAME
 trefoil agents run     --agent=NAME "task text"     # or --input=file://input.json, -d to detach

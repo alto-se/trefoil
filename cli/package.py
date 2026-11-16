@@ -14,6 +14,7 @@ directory of the file that references them.
 Usage: trefoil <domain> <command> [args]
 
   trefoil init [DIR] [--example=NAME]
+  trefoil update
   trefoil config package path/to/config.yml [-o bundle.json]
   trefoil config sync [path/to/config.yml] [--server URL]
   trefoil agents list
@@ -30,8 +31,11 @@ import argparse
 import base64
 import getpass
 import importlib.metadata
+import importlib.util
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -176,6 +180,22 @@ def cmd_init(args):
         sys.exit(f"trefoil: cannot fetch example {args.example}: {e.reason}")
     print(f"created {dest} from example {args.example} ({len(files)} files)")
     print(f"next: cd {dest} && trefoil config sync")
+
+
+def cmd_update(args):
+    # An editable install runs straight from a checkout; reinstalling from PyPI would replace it.
+    if Path(__file__).with_name("pyproject.toml").exists():
+        sys.exit(f"trefoil: running from a source checkout ({Path(__file__).parent}); "
+                 "pull and run `make cli` instead")
+    # uv-created environments (uv tool install, uv venv) have no pip of their own.
+    if importlib.util.find_spec("pip"):
+        cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--force-reinstall", "trefoil-cli"]
+    elif shutil.which("uv"):
+        cmd = ["uv", "pip", "install", "--python", sys.executable, "--upgrade", "--reinstall", "trefoil-cli"]
+    else:
+        sys.exit("trefoil: neither pip nor uv is available to reinstall trefoil-cli")
+    print(f"trefoil {cli_version()}: {' '.join(cmd)}", file=sys.stderr)
+    sys.exit(subprocess.run(cmd).returncode)
 
 
 def api_request(server, method, path, body=None, timeout=30, raw=False):
@@ -509,6 +529,9 @@ def main():
     init.add_argument("--example", default="echo", metavar="NAME",
                       help="example under examples/ in github.com/alto-se/trefoil (default: echo)")
     init.set_defaults(func=cmd_init)
+
+    update = domains.add_parser("update", help="reinstall the latest trefoil-cli from PyPI")
+    update.set_defaults(func=cmd_update)
 
     config = domain("config", "package and upload agent configs")
     package = config.add_parser("package", help=__doc__.splitlines()[0])

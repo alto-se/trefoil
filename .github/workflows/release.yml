@@ -1,0 +1,142 @@
+# Releases trefoil: semantic-release cuts a version tag, then the CLI and the
+# API image are built from that tag and published with its version.
+#
+#   release -> tag v<version> -> cli   (PyPI: trefoil-cli <version>)
+#                             -> image (ghcr.io/<owner>/trefoil-api:<version>)
+#
+# Version: semantic-release reads conventional commits since the last v* tag
+# (fix: -> patch, feat: -> minor, feat!: / BREAKING CHANGE -> major), writes the
+# new version to VERSION and cli/pyproject.toml, commits it back to main, tags
+# v<version> and creates a GitHub release. Config lives in .releaserc.json.
+# Pushes with no releasable commits (chore:, docs:, ...) publish nothing.
+#
+# The CLI uses PyPI trusted publishing (no API token): the publisher for project
+# "trefoil-cli" must name repo alto-se/trefoil, workflow release.yml,
+# environment pypi.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      published: ${{ steps.semrel.outputs.new_release_published }}
+      version: ${{ steps.semrel.outputs.new_release_version }}
+      tag: ${{ steps.semrel.outputs.new_release_git_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: semrel
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            @semantic-release/exec
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cli-build:
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Check version
+        run: grep -x 'version = "${{ needs.release.outputs.version }}"' cli/pyproject.toml
+
+      - name: Build
+        working-directory: cli
+        run: uv build --out-dir ../dist
+
+      - name: Smoke test
+        run: |
+          uv venv /tmp/venv
+          uv pip install --python /tmp/venv dist/*.whl
+          /tmp/venv/bin/trefoil --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  cli-publish:
+    needs: [release, cli-build]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/trefoil-cli/${{ needs.release.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  image:
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+
+      - name: Test
+        working-directory: api
+        run: go test ./...
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/trefoil-api
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.release.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release.outputs.version }}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
