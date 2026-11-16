@@ -216,10 +216,10 @@ func (s *server) handleUIModules(w http.ResponseWriter, r *http.Request) {
 // secretRow is one secret the config's modules declare. Source is where its
 // value comes from: "stored", "env" or "" when it has none.
 type secretRow struct {
-	Name     string
-	Required bool
-	Agents   []string
-	Source   string
+	Name     string   `json:"name"`
+	Required bool     `json:"required"`
+	Agents   []string `json:"agents"`
+	Source   string   `json:"source"`
 }
 
 type secretsView struct {

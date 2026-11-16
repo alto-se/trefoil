@@ -25,6 +25,21 @@ func secretPath(key string) string {
 	return path.Join("secrets", strings.ToUpper(key))
 }
 
+// handleListSecrets lists the secrets the config's agents need and where
+// each value comes from, never the values themselves.
+func (s *server) handleListSecrets(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.loadConf(w, r)
+	if !ok {
+		return
+	}
+	rows, err := s.secretRows(r.Context(), c)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
+}
+
 // handlePostSecret stores the secret named in the path from a
 // {"value": "..."} body. The value is never echoed back.
 func (s *server) handlePostSecret(w http.ResponseWriter, r *http.Request) {

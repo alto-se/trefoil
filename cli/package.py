@@ -27,6 +27,8 @@ Usage: trefoil <domain> <command> [args]
   trefoil sessions status|logs|result --agent=NAME ID
   trefoil sessions rerun --agent=NAME ID [-d]
   trefoil sessions artifacts --agent=NAME ID [-o DIR]
+  trefoil secrets list
+  trefoil secrets set --name=NAME
   trefoil jobs list [--agent=NAME] [--status=STATUS]
   trefoil jobs status ID [-f] [--logs]
 """
@@ -533,6 +535,16 @@ def cmd_secrets_set(args):
     print(f"stored secret {args.name} on {args.server}", file=sys.stderr)
 
 
+def cmd_secrets_list(args):
+    secrets = api_request(args.server, "GET", "/secrets")
+    rows = [
+        (s["name"], "yes" if s["required"] else "no",
+         s["source"] or ("missing" if s["required"] else "not set"), ", ".join(s["agents"]))
+        for s in secrets
+    ]
+    print_table(("NAME", "REQUIRED", "SOURCE", "USED BY"), rows, empty="no secrets")
+
+
 def cmd_params_list(args):
     params = api_request(args.server, "GET", "/params")
     rows = [
@@ -817,6 +829,9 @@ def main():
                              help="print the new session id and return instead of following the run")
 
     secrets = domain("secrets", "provide secrets that agents' modules require")
+    secrets_list = secrets.add_parser("list", parents=[server],
+                                      help="list the secrets agents need and whether they're set (never values)")
+    secrets_list.set_defaults(func=cmd_secrets_list)
     secrets_set = secrets.add_parser("set", parents=[server],
                                      help="store a secret on the server (value from a prompt or stdin)")
     secrets_set.add_argument("--name", required=True, metavar="NAME", help="secret name, e.g. github_token")

@@ -67,6 +67,7 @@ func New(logger *slog.Logger, st store.Store, v *schema.Validator, d build.Docke
 	mux.HandleFunc("POST /conf", s.handlePostConf)
 	mux.HandleFunc("GET /conf", s.handleGetConf)
 	mux.HandleFunc("GET /agents", s.handleListAgents)
+	mux.HandleFunc("GET /secrets", s.handleListSecrets)
 	mux.HandleFunc("POST /secret/{id}", s.handlePostSecret)
 	mux.HandleFunc("GET /params", s.handleListParams)
 	mux.HandleFunc("POST /param/{name}", s.handlePostParam)

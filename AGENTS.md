@@ -100,6 +100,7 @@ trefoil sessions stop   --agent=echo SESSION_ID
 trefoil sessions rerun  --agent=echo SESSION_ID [-d]
 trefoil sessions artifacts --agent=pdf SESSION_ID [-o DIR]
 
+trefoil secrets list                             # names, required, source (stored/env), never values
 trefoil secrets set --name=github_token          # value from prompt or stdin
 trefoil params list
 trefoil params set --name=repo owner/name        # or value on stdin
@@ -219,7 +220,10 @@ time the server sets `GITHUB_TOKEN` in the container from the value stored
 with `POST /secret/github_token` (`{"value": "..."}`, written to
 `<data dir>/secrets/GITHUB_TOKEN`), falling back to `TREFOIL_SECRET_GITHUB_TOKEN`
 in its environment (or `env_file`). A missing required secret rejects the run
-with 422 and `missing_secrets: [...]` before anything starts. A module's `mcps` are streamable-HTTP MCP
+with 422 and `missing_secrets: [...]` before anything starts. `GET /secrets`
+(`trefoil secrets list`) lists the secrets the config's agents need, with
+`required`, `agents` and `source` (`stored`, `env` or empty when unset);
+values are never returned. A module's `mcps` are streamable-HTTP MCP
 servers the harness connects to; `credentials` are HTTP headers where
 `${NAME}` expands from the container env. See `modules/code/github` and
 `examples/github`.

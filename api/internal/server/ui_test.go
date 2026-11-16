@@ -214,6 +214,13 @@ func TestUISecrets(t *testing.T) {
 		t.Errorf("agents fragment still needs secret:\n%s", agents)
 	}
 
+	var rows []secretRow
+	_ = json.Unmarshal(do(h, http.MethodGet, "/secrets", "").Body.Bytes(), &rows)
+	if len(rows) != 2 || rows[0].Name != "EXTRA" || rows[0].Source != "env" || rows[1].Name != "GITHUB_TOKEN" || !rows[1].Required ||
+		rows[1].Source != "stored" || strings.Join(rows[1].Agents, ",") != "a" {
+		t.Errorf("GET /secrets = %+v", rows)
+	}
+
 	if body := post(url.Values{"name": {"not-env"}, "value": {"x"}}).Body.String(); !strings.Contains(body, "secret name must match") {
 		t.Errorf("bad name: %s", body)
 	}
