@@ -1,14 +1,16 @@
-# Releases trefoil: semantic-release cuts a version tag, then the CLI and the
+# Releases trefoil: scripts/release.py cuts a version tag, then the CLI and the
 # API image are built from that tag and published with its version.
 #
 #   release -> tag v<version> -> cli   (PyPI: trefoil-cli <version>)
 #                             -> image (ghcr.io/<owner>/trefoil-api:<version>)
 #
-# Version: semantic-release reads conventional commits since the last v* tag
-# (fix: -> patch, feat: -> minor, feat!: / BREAKING CHANGE -> major), writes the
-# new version to VERSION and cli/pyproject.toml, commits it back to main, tags
-# v<version> and creates a GitHub release. Config lives in .releaserc.json.
-# Pushes with no releasable commits (chore:, docs:, ...) publish nothing.
+# Version: the VERSION file is the source of truth (tags are never read). If it
+# was edited by hand since the last `chore(release):` commit, that version is
+# released as is; otherwise conventional commits since then bump it (fix: ->
+# patch, feat: -> minor, feat!: / BREAKING CHANGE -> major, or minor while 0.x).
+# The script writes VERSION, cli/pyproject.toml and cli/uv.lock, commits them
+# back to main, tags v<version> and creates a GitHub release. Pushes with no
+# releasable commits (chore:, docs:, ...) publish nothing.
 #
 # The CLI uses PyPI trusted publishing (no API token): the publisher for project
 # "trefoil-cli" must name repo alto-se/trefoil, workflow release.yml,
@@ -29,25 +31,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      issues: write
-      pull-requests: write
     outputs:
-      published: ${{ steps.semrel.outputs.new_release_published }}
-      version: ${{ steps.semrel.outputs.new_release_version }}
-      tag: ${{ steps.semrel.outputs.new_release_git_tag }}
+      published: ${{ steps.release.outputs.published }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - id: semrel
-        uses: cycjimmy/semantic-release-action@v4
-        with:
-          extra_plugins: |
-            @semantic-release/exec
-            @semantic-release/git
+      - id: release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 scripts/release.py
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cli-build:
     needs: release

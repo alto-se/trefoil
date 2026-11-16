@@ -31,16 +31,20 @@ make seed    # trefoil config sync $(CONFIG)
 
 ## Releases
 
-Pushes to `main` are released by `.github/workflows/release.yml`:
-semantic-release (config in `.releaserc.json`) derives the version from
-conventional commits since the last `v*` tag (`fix:` bumps patch, `feat:`
-bumps minor, and while pre-1.0 `feat!:` or `BREAKING CHANGE:` also bumps
-minor (a `releaseRules` cap in `.releaserc.json`; drop it to go 1.0); other types such as
-`chore:` and `docs:` release nothing), commits `VERSION` and
-`cli/pyproject.toml` back to `main` and tags `v<version>`. Then, from that
+Pushes to `main` are released by `.github/workflows/release.yml`, which runs
+`scripts/release.py`. The `VERSION` file is the source of truth (git tags are
+written, never read): if it was edited by hand since the last
+`chore(release):` commit, that exact version is released; otherwise the
+conventional commits since then bump it (`fix:` patch, `feat:` minor,
+`feat!:` or `BREAKING CHANGE:` major, but only minor while 0.x; other types
+such as `chore:` and `docs:` release nothing). The script commits `VERSION`,
+`cli/pyproject.toml` and `cli/uv.lock` back to `main` and tags
+`v<version>`. Set `VERSION` by hand to pick a version (e.g. to go 1.0); run
+`scripts/release.py --dry-run` to see what the next release would be.
+Then, from that
 tag, the CLI is published to PyPI as `trefoil-cli` (trusted publishing) and
 the API image to `ghcr.io/alto-se/trefoil-api:<version>`, `:<major>.<minor>`
-and `:latest`. Never edit the version by hand. Pull requests run
+and `:latest`. Pull requests run
 `.github/workflows/ci.yml` (`go test`, image build, CLI build and smoke test).
 Install the CLI with `pip install trefoil-cli` (the command is `trefoil`).
 
@@ -63,6 +67,7 @@ after the command.
 
 ```sh
 trefoil --version
+trefoil init [DIR] [--example=NAME]  # copy examples/NAME from GitHub (default: starter)
 trefoil update                     # reinstall the latest trefoil-cli via pip (or uv)
 trefoil engine start [--settings=backend.yml] [--port=8080] [-d]  # docker run the API image
 trefoil engine stop [--name=trefoil-api]

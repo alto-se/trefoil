@@ -1,6 +1,6 @@
 env_file: .env
 
-aws: 
+aws:
   region: eu-west-1
   
 llm_provider: 

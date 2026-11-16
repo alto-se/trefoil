@@ -95,7 +95,7 @@ Server settings (port, AWS region, providers, data dir, `.env` file) are in
 ## CLI at a glance
 
 ```sh
-trefoil init [DIR] [--example=NAME]   # scaffold from examples/ on GitHub (default: echo)
+trefoil init [DIR] [--example=NAME]   # scaffold from examples/ on GitHub (default: starter)
 trefoil update                        # reinstall the latest trefoil-cli from PyPI
 trefoil agents list
 trefoil agents build   --agent=NAME
@@ -125,7 +125,8 @@ Each shared module can carry a `tests.py` that runs inside its real image:
 
 ## Examples
 
-`examples/` has a config per use case: `echo` (minimal), `writer` (file
+`examples/` has a config per use case: `echo` (minimal), `starter` (the
+`trefoil init` default: params, a local module with a skill, artifacts), `writer` (file
 tools), `local` (local modules and split configs), `github`, `aws`,
 `postgres`, `pdf` (browse and print with Chromium), `opendoc`,
 `release-notes`, `humanizer` (skill from a GitHub zip), `repo-ops` (params

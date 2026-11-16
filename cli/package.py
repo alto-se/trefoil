@@ -568,8 +568,8 @@ def main():
 
     init = domains.add_parser("init", help="scaffold a project from an example config")
     init.add_argument("dir", type=Path, nargs="?", help="directory to create (default: the example's name)")
-    init.add_argument("--example", default="echo", metavar="NAME",
-                      help="example under examples/ in github.com/alto-se/trefoil (default: echo)")
+    init.add_argument("--example", default="starter", metavar="NAME",
+                      help="example under examples/ in github.com/alto-se/trefoil (default: starter)")
     init.set_defaults(func=cmd_init)
 
     update = domains.add_parser("update", help="reinstall the latest trefoil-cli from PyPI")
