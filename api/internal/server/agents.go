@@ -210,6 +210,40 @@ func (s *server) runAgent(w http.ResponseWriter, r *http.Request, name string) {
 		return
 	}
 	sess, status, err := s.startRun(r.Context(), c, agent, input)
+	s.writeRun(w, sess, status, err)
+}
+
+// handleSessionRerun starts a new session of the same agent with the input
+// the session was started with, params as they were filled in then.
+func (s *server) handleSessionRerun(w http.ResponseWriter, r *http.Request) {
+	old, ok := s.session(w, r)
+	if !ok {
+		return
+	}
+	sess, status, err := s.rerun(r.Context(), old)
+	s.writeRun(w, sess, status, err)
+}
+
+// rerun starts old's agent again with old's input. On error it also returns
+// the HTTP status that fits it.
+func (s *server) rerun(ctx context.Context, old *sessions.Session) (*sessions.Session, int, error) {
+	if old.Input() == nil {
+		return nil, http.StatusConflict, errors.New("session has no stored input; it was started before inputs were kept")
+	}
+	c, status, err := s.readConf(ctx)
+	if err != nil {
+		return nil, status, err
+	}
+	agent, err := c.Agent(old.Agent())
+	if err != nil {
+		return nil, http.StatusNotFound, err
+	}
+	return s.startRun(ctx, c, agent, old.Input())
+}
+
+// writeRun answers a request that started a run: the new session, or the
+// error with any missing secrets or params listed.
+func (s *server) writeRun(w http.ResponseWriter, sess *sessions.Session, status int, err error) {
 	var missing missingSecretsError
 	var missingParams missingParamsError
 	if errors.As(err, &missing) {
@@ -222,7 +256,7 @@ func (s *server) runAgent(w http.ResponseWriter, r *http.Request, name string) {
 		writeError(w, status, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"session_id": sess.ID(), "agent": name, "status": sessions.Running})
+	writeJSON(w, http.StatusAccepted, map[string]any{"session_id": sess.ID(), "agent": sess.Agent(), "status": sessions.Running})
 }
 
 // startRun checks input against the agent and starts its image in the
@@ -276,7 +310,7 @@ func (s *server) startRun(ctx context.Context, c *conf.Conf, agent *conf.Agent, 
 	limitsJSON, _ := json.Marshal(limits)
 	// The run outlives the request; its timeout comes from the limits, and
 	// its context ends early on a stop.
-	sess := s.sessions.Start(name, limits, func(ctx context.Context, sess *sessions.Session) (*sessions.Result, error) {
+	sess := s.sessions.Start(name, limits, input, func(ctx context.Context, sess *sessions.Session) (*sessions.Result, error) {
 		res, err := s.docker.Run(ctx, tag, input, build.RunOptions{
 			Env:       map[string]string{"TREFOIL_LIMITS": string(limitsJSON)},
 			Timeout:   time.Duration(limits.TimeoutSeconds * float64(time.Second)),

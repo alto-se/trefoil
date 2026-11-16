@@ -3,7 +3,8 @@
     <a href="#runs" class="muted">← Runs</a>
     <h2>{{.Agent}} <span class="pill {{.Status}}">{{.Status}}</span></h2>
     <span class="muted">started {{ago .CreatedAt}} · {{if eq .Status "running"}}running for{{else}}took{{end}} {{dur .CreatedAt .FinishedAt}}</span>
-    {{if eq .Status "running"}}<button hx-post="/agents/{{.Agent}}/sessions/{{.ID}}/stop" hx-swap="none" hx-confirm="Stop this run? Its container is killed.">Stop</button>{{end}}
+    {{if eq .Status "running"}}<button hx-post="/agents/{{.Agent}}/sessions/{{.ID}}/stop" hx-swap="none" hx-confirm="Stop this run? Its container is killed.">Stop</button>
+    {{else if .CanRerun}}<span class="failed rerun-error" id="rerun-error-{{.ID}}"></span><button class="rerun" hx-post="/ui/sessions/{{.ID}}/rerun" hx-target="#rerun-error-{{.ID}}" title="Run {{.Agent}} again with the same input">Rerun</button>{{end}}
   </header>
   <dl>
     <dt>Session</dt><dd class="mono">{{.ID}}</dd>
@@ -50,6 +51,10 @@
           </dd>
           {{end}}
         </dl>
+      </section>{{end}}
+      {{if .Input}}<section>
+        <h2>Input</h2>
+        <pre class="flush">{{.Input}}</pre>
       </section>{{end}}
       {{if .Result}}<section>
         <h2>Output</h2>

@@ -16,14 +16,16 @@ Usage: trefoil <domain> <command> [args]
   trefoil init [DIR] [--example=NAME]
   trefoil update
   trefoil engine start [--settings=backend.yml] [--port=8080] [--foreground]
+                       [--setup] [--provider=bedrock|anthropic] [--aws-profile=P] [--aws-region=R]
   trefoil engine stop
   trefoil config package path/to/config.yml [-o bundle.json]
   trefoil config sync [path/to/config.yml] [--server URL]
   trefoil agents list
   trefoil agents build --agent=NAME [-d] [--dockerfile]
-  trefoil agents get-bundle --agent=NAME [-o FILE]
+  trefoil agents get-dockerfile --agent=NAME [-o FILE]
   trefoil agents run --agent=NAME [TASK | --input=JSON|file://PATH] [-d]
   trefoil sessions status|logs|result --agent=NAME ID
+  trefoil sessions rerun --agent=NAME ID [-d]
   trefoil sessions artifacts --agent=NAME ID [-o DIR]
   trefoil jobs list [--agent=NAME] [--status=STATUS]
   trefoil jobs status ID [-f] [--logs]
@@ -49,6 +51,7 @@ import yaml
 
 DEFAULT_SERVER = "http://localhost:8080"
 EXAMPLES_API = "https://api.github.com/repos/alto-se/trefoil/contents/examples"
+ENGINE_IMAGE = "ghcr.io/alto-se/trefoil-api:latest"
 
 
 class Ref:
@@ -201,9 +204,147 @@ def cmd_update(args):
     sys.exit(subprocess.run(cmd).returncode)
 
 
+def aws_credentials(profile):
+    """Resolves a profile (SSO, assumed role, ...) to AWS_* variables with the AWS CLI."""
+    if not shutil.which("aws"):
+        sys.exit("trefoil: --aws-profile needs the AWS CLI (aws) on PATH")
+    out = subprocess.run(["aws", "configure", "export-credentials", "--profile", profile, "--format", "process"],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        sys.exit(f"trefoil: aws profile {profile}: {out.stderr.strip() or 'no credentials'}"
+                 f" (try: aws sso login --profile {profile})")
+    creds = json.loads(out.stdout)
+    env = {"AWS_ACCESS_KEY_ID": creds["AccessKeyId"], "AWS_SECRET_ACCESS_KEY": creds["SecretAccessKey"]}
+    if creds.get("SessionToken"):
+        env["AWS_SESSION_TOKEN"] = creds["SessionToken"]
+    if creds.get("Expiration"):
+        print(f"trefoil: credentials from profile {profile} expire at {creds['Expiration']}; "
+              "restart the engine after that", file=sys.stderr)
+    region = subprocess.run(["aws", "configure", "get", "region", "--profile", profile],
+                            capture_output=True, text=True).stdout.strip()
+    if region:
+        env["AWS_REGION"] = region
+    return env
+
+
+def provider_env(args):
+    """Returns the variables the engine container needs for args.provider.
+
+    Values go in the docker process's environment and are passed by name
+    ("-e NAME"), so they don't show up in the printed command or ps."""
+    env = {"LLM_PROVIDER": args.provider}
+    if args.provider == "bedrock":
+        profile = args.aws_profile or (os.environ.get("AWS_PROFILE")
+                                       if not os.environ.get("AWS_ACCESS_KEY_ID") else None)
+        if profile:
+            env.update(aws_credentials(profile))
+        else:
+            for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_BEARER_TOKEN_BEDROCK"):
+                if os.environ.get(name):
+                    env[name] = os.environ[name]
+        if not (env.get("AWS_ACCESS_KEY_ID") or env.get("AWS_BEARER_TOKEN_BEDROCK")):
+            sys.exit("trefoil: no AWS credentials for bedrock: pass --aws-profile or set "
+                     "AWS_PROFILE, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY or AWS_BEARER_TOKEN_BEDROCK")
+        region = args.aws_region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") \
+            or env.get("AWS_REGION")
+        if not region:
+            sys.exit("trefoil: no AWS region for bedrock: pass --aws-region or set AWS_REGION")
+        env["AWS_REGION"] = region
+    elif args.provider == "anthropic":
+        key = os.environ.get("ANTHROPIC_API_KEY")
+        if not key and sys.stdin.isatty():
+            key = getpass.getpass("ANTHROPIC_API_KEY: ").strip()
+        if not key:
+            sys.exit("trefoil: set ANTHROPIC_API_KEY to use the anthropic provider")
+        env["ANTHROPIC_API_KEY"] = key
+        if os.environ.get("ANTHROPIC_BASE_URL"):
+            env["ANTHROPIC_BASE_URL"] = os.environ["ANTHROPIC_BASE_URL"]
+    return env
+
+
+ENGINE_FILE = Path.home() / ".trefoil" / "engine.json"
+
+
+def ask(question, default=None, choices=None):
+    """Prompts on stderr (stdout stays for results) until the answer is valid."""
+    hint = f" [{default}]" if default else ""
+    while True:
+        sys.stderr.write(f"{question}{hint}: ")
+        sys.stderr.flush()
+        try:
+            answer = input().strip() or default or ""
+        except EOFError:
+            sys.exit("\ntrefoil: setup cancelled")
+        if choices is None and answer:
+            return answer
+        if choices and answer.isdigit() and 1 <= int(answer) <= len(choices):
+            return choices[int(answer) - 1]
+        if choices and answer in choices:
+            return answer
+
+
+def pick(question, options, default=None):
+    """Asks for one of options (shown numbered); returns the chosen one."""
+    for i, option in enumerate(options, 1):
+        print(f"  {i}) {option}", file=sys.stderr)
+    return ask(question, default if default in options else None, options)
+
+
+def engine_setup(saved):
+    """Asks which LLM backend the engine uses; returns the (non-secret) answers."""
+    print("trefoil engine setup (saved to {}, rerun with --setup)".format(ENGINE_FILE), file=sys.stderr)
+    labels = {"bedrock": "bedrock (AWS)", "anthropic": "anthropic (API key)"}
+    label = pick("LLM backend", list(labels.values()), labels.get(saved.get("provider"), labels["bedrock"]))
+    provider = next(k for k, v in labels.items() if v == label)
+    choice = {"provider": provider}
+    if provider == "bedrock":
+        profiles = []
+        if shutil.which("aws"):
+            profiles = subprocess.run(["aws", "configure", "list-profiles"],
+                                      capture_output=True, text=True).stdout.split()
+        env_creds = "credentials from environment (AWS_ACCESS_KEY_ID, ...)"
+        options = profiles + [env_creds]
+        default = saved.get("aws_profile") or os.environ.get("AWS_PROFILE") or ("default" if "default" in profiles else None)
+        if not profiles:
+            print("  (no AWS CLI profiles found; set AWS_* variables before engine start)", file=sys.stderr)
+        profile = pick("AWS credentials", options, default or options[0])
+        region = None
+        if profile != env_creds:
+            choice["aws_profile"] = profile
+            region = subprocess.run(["aws", "configure", "get", "region", "--profile", profile],
+                                    capture_output=True, text=True).stdout.strip() or None
+        choice["aws_region"] = ask("AWS region", saved.get("aws_region") or region
+                                   or os.environ.get("AWS_REGION") or "eu-west-1")
+    elif not os.environ.get("ANTHROPIC_API_KEY"):
+        print("  ANTHROPIC_API_KEY isn't set; you'll be asked for it on each start "
+              "(export it to skip that). It is never saved.", file=sys.stderr)
+    ENGINE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ENGINE_FILE.write_text(json.dumps(choice, indent=2) + "\n")
+    return choice
+
+
+def apply_engine_choice(args):
+    """Fills args.provider/aws_* from ~/.trefoil/engine.json, running setup on
+    first use (or with --setup). Flags and --settings win over saved answers."""
+    if args.provider and not args.setup:
+        return
+    try:
+        saved = json.loads(ENGINE_FILE.read_text())
+    except (OSError, ValueError):
+        saved = {}
+    if args.setup or (not saved and not args.settings and sys.stdin.isatty()):
+        saved = engine_setup(saved)
+    if args.settings and not args.setup:
+        return
+    args.provider = args.provider or saved.get("provider")
+    args.aws_profile = args.aws_profile or saved.get("aws_profile")
+    args.aws_region = args.aws_region or saved.get("aws_region")
+
+
 def cmd_engine_start(args):
     if not shutil.which("docker"):
         sys.exit("trefoil: docker is not installed or not on PATH")
+    apply_engine_choice(args)
     cmd = ["docker", "run", "--rm", "--name", args.name, "-p", f"{args.port}:8080",
            "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", f"{args.volume}:/data"]
     if args.settings:
@@ -224,11 +365,15 @@ def cmd_engine_start(args):
                 sys.exit(f"trefoil: env_file {host} (from {args.settings}) not found")
             target = env_file if os.path.isabs(env_file) else os.path.normpath(f"/trefoil/settings/{env_file}")
             cmd += ["-v", f"{host}:{target}:ro"]
+    env = provider_env(args) if args.provider else {}
+    for name in env:
+        cmd += ["-e", name]
     if not args.foreground:
         cmd.append("-d")
     cmd.append(args.image)
     print(f"trefoil: {' '.join(cmd)}", file=sys.stderr)
-    code = subprocess.run(cmd, stdout=subprocess.DEVNULL if not args.foreground else None).returncode
+    code = subprocess.run(cmd, env={**os.environ, **env},
+                          stdout=subprocess.DEVNULL if not args.foreground else None).returncode
     if code == 0 and not args.foreground:
         print(f"trefoil: engine running on http://localhost:{args.port} "
               f"(logs: docker logs -f {args.name}, stop: trefoil engine stop)", file=sys.stderr)
@@ -363,7 +508,11 @@ def cmd_agents_run(args):
     started = api_request(args.server, "POST", f"/agents/{quote(args.agent)}/run", body)
     if "session_id" not in started:
         sys.exit(f"trefoil: server at {args.server} doesn't return sessions; is it up to date? (restart `make dev`)")
-    session_id = started["session_id"]
+    follow_run(args, started["session_id"])
+
+
+def follow_run(args, session_id):
+    """Follows a session that was just started, or prints its id with -d."""
     print(f"session {session_id}: running {args.agent}", file=sys.stderr)
     if args.detach:
         print(session_id)
@@ -484,6 +633,12 @@ def cmd_sessions_result(args):
     print_result(args.server, args.agent, args.id)
 
 
+def cmd_sessions_rerun(args):
+    started = api_request(args.server, "POST", session_path(args.agent, args.id, "rerun"))
+    print(f"rerunning session {args.id} with the same input", file=sys.stderr)
+    follow_run(args, started["session_id"])
+
+
 def cmd_sessions_stop(args):
     api_request(args.server, "POST", session_path(args.agent, args.id, "stop"))
     print(f"stopping session {args.id}; it finishes as failed with error \"stopped\"", file=sys.stderr)
@@ -583,9 +738,18 @@ def main():
     engine_start = engine.add_parser("start", help="run the trefoil API server image")
     engine_start.add_argument("--settings", type=Path, metavar="FILE",
                                help="backend settings file (backend.yml) to mount into the container")
+    engine_start.add_argument("--provider", choices=["bedrock", "anthropic"],
+                               help="LLM backend agents use (overrides llm_provider in --settings); "
+                                    "bedrock takes AWS credentials, anthropic ANTHROPIC_API_KEY")
+    engine_start.add_argument("--setup", action="store_true",
+                               help=f"ask for the LLM backend again (answers are saved to {ENGINE_FILE})")
+    engine_start.add_argument("--aws-profile", metavar="PROFILE",
+                               help="AWS profile to take bedrock credentials and region from "
+                                    "(default: $AWS_PROFILE unless AWS_ACCESS_KEY_ID is set)")
+    engine_start.add_argument("--aws-region", metavar="REGION",
+                               help="AWS region for bedrock (default: $AWS_REGION or the profile's region)")
     engine_start.add_argument("--port", type=int, default=8080, help="host port to publish (default: 8080)")
-    engine_start.add_argument("--image", default="ghcr.io/alto-se/trefoil-api:latest",
-                               help="API image (default: ghcr.io/alto-se/trefoil-api:latest)")
+    engine_start.add_argument("--image", default=ENGINE_IMAGE, help=f"API image (default: {ENGINE_IMAGE})")
     engine_start.add_argument("--name", default="trefoil-api", help="container name (default: trefoil-api)")
     engine_start.add_argument("--volume", default="trefoil-data",
                                help="docker volume (or host path) for the data dir (default: trefoil-data)")
@@ -616,11 +780,12 @@ def main():
     agents_build.add_argument("--dockerfile", action="store_true", help="print the generated Dockerfile")
     agents_build.set_defaults(func=cmd_agents_build)
 
-    agents_context = agents.add_parser("get-bundle", aliases=["context"], parents=[server, agent],
+    agents_context = agents.add_parser("get-dockerfile", aliases=["context"], parents=[server, agent],
                                        help="download an agent's build context (Dockerfile and files) as a zip")
     agents_context.add_argument("-o", "--output", type=Path, metavar="FILE",
                                 help="where to save the zip (default: ./NAME-context.zip)")
     agents_context.set_defaults(func=cmd_agents_context)
+
 
     agents_run = agents.add_parser("run", parents=[server, agent], help="run a built agent with a task")
     agents_run.add_argument("task", nargs="?", help="task for the agent (default: read from stdin)")
@@ -635,6 +800,7 @@ def main():
                                   ("logs", cmd_sessions_logs, "print a session's logs"),
                                   ("result", cmd_sessions_result, "print a finished session's answer"),
                                   ("stop", cmd_sessions_stop, "stop a running session"),
+                                  ("rerun", cmd_sessions_rerun, "run a session's agent again with the same input"),
                                   ("artifacts", cmd_sessions_artifacts, "list or download a session's artifacts")):
         sub = sessions.add_parser(name, parents=[server, agent], help=help_text)
         sub.add_argument("id", help="session id")
@@ -646,6 +812,9 @@ def main():
         if name == "artifacts":
             sub.add_argument("-o", "--output", type=Path, metavar="DIR",
                              help="download every artifact into DIR instead of listing them")
+        if name == "rerun":
+            sub.add_argument("-d", "--detach", action="store_true",
+                             help="print the new session id and return instead of following the run")
 
     secrets = domain("secrets", "provide secrets that agents' modules require")
     secrets_set = secrets.add_parser("set", parents=[server],

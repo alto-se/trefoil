@@ -57,7 +57,7 @@ config-driven workflow:
   are injected only at run time.
 - **Local first, cloud ready.** The same server, CLI and dashboard run on your
   machine with `make dev`; the build context for any agent can be exported as
-  a plain Docker build (`trefoil agents get-bundle`) to run anywhere.
+  a plain Docker build (`trefoil agents get-dockerfile`) to run anywhere.
 
 ## Concepts
 

@@ -57,6 +57,17 @@ build and run agents, so mount the host socket:
 `trefoil engine start` runs that command (`trefoil engine stop` stops it); `--settings FILE` mounts a
 backend.yml read-only (plus its `env_file`) and sets `TREFOIL_SETTINGS`.
 `ADDR`/`DATA_DIR` in the image still win over the file's port and storage path.
+`--provider bedrock|anthropic` picks the LLM backend (sets `LLM_PROVIDER`,
+a comma-separated override of `llm_provider`) and passes its credentials
+into the container by name: for bedrock, `--aws-profile` (or `AWS_PROFILE`)
+is resolved with `aws configure export-credentials` (temporary keys, so
+restart the engine when they expire), else `AWS_ACCESS_KEY_ID`/... or
+`AWS_BEARER_TOKEN_BEDROCK` are forwarded, with `--aws-region` or
+`AWS_REGION`; for anthropic, `ANTHROPIC_API_KEY` (prompted if unset).
+On first interactive start without `--provider` or `--settings`, it asks
+for the backend (and AWS profile/region, listing `aws configure
+list-profiles`) and saves the answers, never keys, to
+`~/.trefoil/engine.json`; later starts reuse them, `--setup` asks again.
 
 ## CLI shape
 
@@ -70,13 +81,15 @@ trefoil --version
 trefoil init [DIR] [--example=NAME]  # copy examples/NAME from GitHub (default: starter)
 trefoil update                     # reinstall the latest trefoil-cli via pip (or uv)
 trefoil engine start [--settings=backend.yml] [--port=8080] [--foreground]  # docker run -d the API image
+trefoil engine start --provider=bedrock --aws-profile=dev [--aws-region=eu-west-1]  # or --provider=anthropic
+trefoil engine start --setup        # ask for the backend again (saved in ~/.trefoil/engine.json)
 trefoil engine stop [--name=trefoil-api]
 trefoil config package path/to/config.yml [-o bundle.json]
 trefoil config sync [path/to/config.yml]
 
 trefoil agents list
 trefoil agents build --agent=echo [-d] [--dockerfile]
-trefoil agents get-bundle --agent=echo [-o FILE]       # build context as a zip
+trefoil agents get-dockerfile --agent=echo [-o FILE]   # build context as a zip
 trefoil agents run --agent=echo --input=file://input.json [-d]
 trefoil agents run --agent=echo "task text"        # or pipe the task on stdin
 
@@ -84,6 +97,7 @@ trefoil sessions status --agent=echo SESSION_ID
 trefoil sessions logs   --agent=echo SESSION_ID [-f] [-o FILE]
 trefoil sessions result --agent=echo SESSION_ID
 trefoil sessions stop   --agent=echo SESSION_ID
+trefoil sessions rerun  --agent=echo SESSION_ID [-d]
 trefoil sessions artifacts --agent=pdf SESSION_ID [-o DIR]
 
 trefoil secrets set --name=github_token          # value from prompt or stdin
@@ -127,8 +141,9 @@ agents (tests, release-notes, license, triage, deps-audit).
 
 ## Persistence
 
-Everything lives under the data dir (`storage.local.path`, `./.data` in
-`backend.yml`): `conf.json`, `params.json`, `secrets/`, build contexts in
+Everything lives under the data dir (`storage.local.path`, default
+`~/.trefoil/data`; `./.data` in `backend.yml`, `/data` in the image; `~` is
+expanded in settings paths and `DATA_DIR`/`MODULES_DIR`): `conf.json`, `params.json`, `secrets/`, build contexts in
 `builds/<agent>/<job id>/`, and jobs and sessions as `jobs/<id>.json` and
 `sessions/<id>.json` with logs appended live to `<id>.log` next to them. The
 server loads them on start; anything still queued or running is marked failed
@@ -140,7 +155,7 @@ with "interrupted by server restart".
 stored config (as a build would) and sends it as `<agent>-context.zip`: the
 Dockerfile and every file it copies under one `<agent>/` folder, so
 `unzip` then `docker build <agent>` builds the same image outside the
-server. `trefoil agents get-bundle --agent=NAME [-o FILE]` saves it, and the
+server. `trefoil agents get-dockerfile --agent=NAME [-o FILE]` saves it, and the
 dashboard's agent page links to it.
 
 ## Stopping runs
@@ -150,6 +165,15 @@ Stop button on the dashboard's run page) cancels the run's context, which
 `docker kill`s its container; artifacts are still collected. The session
 finishes as `failed` with error `stopped` and a `[trefoil] run stopped by
 request` line in its logs. Stopping a session that isn't running is a 409.
+
+## Rerunning runs
+
+A session keeps the input it was started with, params already filled in
+(`input` in `sessions/<id>.json`). `POST /agents/{name}/sessions/{id}/rerun`
+(`trefoil sessions rerun`, or the Rerun button on the dashboard's run page,
+which also shows the input) starts a new session of the same agent with that
+exact input, against the current config and image; later param changes don't
+apply. Sessions saved before inputs were kept can't be rerun (409).
 
 ## Run timeline events
 

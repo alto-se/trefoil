@@ -109,7 +109,14 @@ func buildAndWait(t *testing.T, h http.Handler, path string) map[string]any {
 // session id and its result.
 func runAndWait(t *testing.T, h http.Handler, agent, body string) (string, map[string]any) {
 	t.Helper()
-	rec := do(h, http.MethodPost, "/agents/"+agent+"/run", body)
+	return startAndWait(t, h, agent, "/agents/"+agent+"/run", body)
+}
+
+// startAndWait POSTs to path, which starts a session of agent, and waits for
+// the session's result.
+func startAndWait(t *testing.T, h http.Handler, agent, path, body string) (string, map[string]any) {
+	t.Helper()
+	rec := do(h, http.MethodPost, path, body)
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("run: status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -276,7 +283,7 @@ func TestRunFillsParams(t *testing.T) {
 		}
 	}
 
-	runAndWait(t, h, "a", `{"version":"v1"}`)
+	first, _ := runAndWait(t, h, "a", `{"version":"v1"}`)
 	if got, want := string(d.stdin), `{"limit":10,"repo":"acme/app","version":"v1"}`; got != want {
 		t.Fatalf("stdin = %s, want %s", got, want)
 	}
@@ -292,6 +299,18 @@ func TestRunFillsParams(t *testing.T) {
 	runAndWait(t, h, "a", `{}`)
 	if got, want := string(d.stdin), `{"limit":5,"repo":"acme/app"}`; got != want {
 		t.Fatalf("stdin = %s, want %s", got, want)
+	}
+
+	// A rerun sends the first run's input again, params as they were then.
+	if rec := do(h, http.MethodPost, "/agents/other/sessions/"+first+"/rerun", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("rerun under another agent: status = %d, want 404", rec.Code)
+	}
+	rerun, _ := startAndWait(t, h, "a", "/agents/a/sessions/"+first+"/rerun", "")
+	if rerun == first {
+		t.Fatal("rerun reused the session id")
+	}
+	if got, want := string(d.stdin), `{"limit":10,"repo":"acme/app","version":"v1"}`; got != want {
+		t.Fatalf("rerun stdin = %s, want %s", got, want)
 	}
 
 	var rows []paramRow

@@ -1,6 +1,6 @@
 // Package settings loads the API server's own settings (backend.yml):
 // defaults, then the YAML file, then environment overrides (ADDR, DATA_DIR,
-// MODULES_DIR).
+// MODULES_DIR, LLM_PROVIDER).
 package settings
 
 import (
@@ -50,9 +50,18 @@ type LocalStorage struct {
 	Path string `yaml:"path"`
 }
 
+// Home is where the server keeps its state by default: ~/.trefoil, or
+// ./.trefoil when the home directory is unknown.
+func Home() string {
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".trefoil")
+	}
+	return ".trefoil"
+}
+
 func Defaults() Settings {
 	return Settings{
-		Storage:    Storage{Default: "local", Local: LocalStorage{Path: "./data"}},
+		Storage:    Storage{Default: "local", Local: LocalStorage{Path: filepath.Join(Home(), "data")}},
 		ServerPort: 8080,
 		ModulesDir: "./modules",
 	}
@@ -74,8 +83,18 @@ func Load(path string) (Settings, error) {
 		}
 		// Relative paths in the file are relative to the file, not the cwd.
 		for _, p := range []*string{&s.EnvFile, &s.Storage.Local.Path, &s.ModulesDir} {
+			*p = expandHome(*p)
 			if *p != "" && !filepath.IsAbs(*p) {
 				*p = filepath.Join(filepath.Dir(path), *p)
+			}
+		}
+	}
+	// LLM_PROVIDER is a comma-separated list, e.g. "bedrock" or "anthropic,bedrock".
+	if v := os.Getenv("LLM_PROVIDER"); v != "" {
+		s.LLMProvider = nil
+		for _, p := range strings.Split(v, ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				s.LLMProvider = append(s.LLMProvider, p)
 			}
 		}
 	}
@@ -91,7 +110,7 @@ func Load(path string) (Settings, error) {
 	s.Addr = ":" + strconv.Itoa(s.ServerPort)
 	for env, field := range map[string]*string{"ADDR": &s.Addr, "DATA_DIR": &s.Storage.Local.Path, "MODULES_DIR": &s.ModulesDir} {
 		if v := os.Getenv(env); v != "" {
-			*field = v
+			*field = expandHome(v)
 		}
 	}
 	return s, nil
@@ -119,6 +138,18 @@ func (s Settings) AgentEnv() map[string]string {
 		env["AWS_REGION"] = s.AWS.Region
 	}
 	return env
+}
+
+// expandHome replaces a leading ~ with the user's home directory.
+func expandHome(p string) string {
+	if p != "~" && !strings.HasPrefix(p, "~/") {
+		return p
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return p
+	}
+	return filepath.Join(home, p[1:])
 }
 
 // loadEnvFile sets KEY=VALUE lines from path that aren't already set.

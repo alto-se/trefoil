@@ -60,6 +60,9 @@ func TestUI(t *testing.T) {
 			if !strings.Contains(detail, "[harness] running") {
 				t.Errorf("session detail missing logs:\n%s", detail)
 			}
+			if !strings.Contains(detail, `hx-post="/ui/sessions/`+id+`/rerun"`) || !strings.Contains(detail, "<h2>Input</h2>") {
+				t.Errorf("session detail missing rerun button or input:\n%s", detail)
+			}
 			break
 		}
 		if time.Now().After(deadline) {
@@ -72,6 +75,13 @@ func TestUI(t *testing.T) {
 	}
 	if rec := do(h, http.MethodGet, "/ui/sessions/missing", ""); rec.Code != http.StatusNotFound {
 		t.Errorf("missing session: status = %d, want 404", rec.Code)
+	}
+	rec = do(h, http.MethodPost, "/ui/sessions/"+id+"/rerun", "")
+	if next := strings.TrimPrefix(rec.Header().Get("HX-Redirect"), "/#runs/"); next == "" || next == id {
+		t.Errorf("rerun: status = %d, HX-Redirect = %q, body = %s", rec.Code, rec.Header().Get("HX-Redirect"), rec.Body)
+	}
+	if rec := do(h, http.MethodPost, "/ui/sessions/missing/rerun", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("rerun missing session: status = %d, want 404", rec.Code)
 	}
 }
 

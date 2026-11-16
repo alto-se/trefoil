@@ -49,12 +49,42 @@ server_port: 9090
 }
 
 func TestLoadNoFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 	s, err := Load("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Addr != ":8080" || s.Storage.Local.Path != "./data" {
+	if s.Addr != ":8080" || s.Storage.Local.Path != filepath.Join(home, ".trefoil", "data") {
 		t.Fatalf("settings = %+v", s)
+	}
+}
+
+func TestLoadExpandsHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("MODULES_DIR", "~/modules")
+	s, err := Load(write(t, t.TempDir(), "backend.yml", "storage:\n  local:\n    path: ~/state\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Storage.Local.Path != filepath.Join(home, "state") || s.ModulesDir != filepath.Join(home, "modules") {
+		t.Fatalf("settings = %+v", s)
+	}
+}
+
+func TestLoadProviderEnv(t *testing.T) {
+	t.Setenv("LLM_PROVIDER", "anthropic, bedrock")
+	s, err := Load(write(t, t.TempDir(), "backend.yml", "llm_provider: [bedrock]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.LLMProvider) != 2 || s.LLMProvider[0] != "anthropic" || s.LLMProvider[1] != "bedrock" {
+		t.Fatalf("llm_provider = %v", s.LLMProvider)
+	}
+	t.Setenv("LLM_PROVIDER", "openai")
+	if _, err := Load(""); err == nil {
+		t.Fatal("want error for unknown provider")
 	}
 }
 

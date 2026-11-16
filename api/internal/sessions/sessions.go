@@ -46,6 +46,7 @@ type Session struct {
 	id         string
 	agent      string
 	limits     conf.Limits
+	input      []byte
 	status     Status
 	logs       strings.Builder
 	result     *Result
@@ -77,6 +78,11 @@ type StatusInfo struct {
 
 func (s *Session) ID() string    { return s.id }
 func (s *Session) Agent() string { return s.agent }
+
+// Input is what the run was started with on stdin, params filled in, so a
+// rerun gets the same values. It is nil for sessions saved before inputs
+// were kept.
+func (s *Session) Input() []byte { return s.input }
 
 // Write appends to the session's logs, so it can be handed to the container
 // as its stderr.
@@ -206,6 +212,7 @@ type record struct {
 	ID         string        `json:"id"`
 	Agent      string        `json:"agent"`
 	Limits     conf.Limits   `json:"limits,omitzero"`
+	Input      []byte        `json:"input,omitempty"`
 	Status     Status        `json:"status"`
 	Result     *storedResult `json:"result,omitempty"`
 	Error      string        `json:"error,omitempty"`
@@ -225,7 +232,7 @@ func (s *Session) save() {
 	if s.dir == "" {
 		return
 	}
-	rec := record{ID: s.id, Agent: s.agent, Limits: s.limits, Status: s.status, Error: s.err,
+	rec := record{ID: s.id, Agent: s.agent, Limits: s.limits, Input: s.input, Status: s.status, Error: s.err,
 		CreatedAt: s.createdAt, FinishedAt: s.finishedAt}
 	if s.result != nil {
 		rec.Result = &storedResult{*s.result, s.result.Structured}
@@ -265,7 +272,7 @@ func Open(dir string) (*Manager, error) {
 		if err := json.Unmarshal(data, &r); err != nil || r.ID == "" {
 			continue // skip files we can't make sense of rather than refuse to start
 		}
-		s := &Session{id: r.ID, agent: r.Agent, limits: r.Limits, status: r.Status, err: r.Error,
+		s := &Session{id: r.ID, agent: r.Agent, limits: r.Limits, input: r.Input, status: r.Status, err: r.Error,
 			createdAt: r.CreatedAt, finishedAt: r.FinishedAt, dir: dir}
 		if r.Result != nil {
 			res := r.Result.Result
@@ -292,10 +299,10 @@ func Open(dir string) (*Manager, error) {
 // Start creates a session and runs fn in the background. fn writes logs to
 // the session and should end the run when ctx is done (see Stop); a returned
 // error means the run couldn't happen at all. limits are kept with the
-// session so its budgets can be shown.
-func (m *Manager) Start(agent string, limits conf.Limits, fn func(ctx context.Context, s *Session) (*Result, error)) *Session {
+// session so its budgets can be shown, and input so it can be rerun.
+func (m *Manager) Start(agent string, limits conf.Limits, input []byte, fn func(ctx context.Context, s *Session) (*Result, error)) *Session {
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{id: newID(), agent: agent, limits: limits, status: Running, createdAt: time.Now(), dir: m.dir, cancel: cancel}
+	s := &Session{id: newID(), agent: agent, limits: limits, input: input, status: Running, createdAt: time.Now(), dir: m.dir, cancel: cancel}
 	if m.dir != "" {
 		s.logFile, _ = os.OpenFile(filepath.Join(m.dir, s.id+".log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	}

@@ -44,6 +44,7 @@ func (s *server) registerUI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /ui/agents/{name}/run", s.handleUIRun)
 	mux.HandleFunc("GET /ui/sessions", s.handleUISessions)
 	mux.HandleFunc("GET /ui/sessions/{id}", s.handleUISession)
+	mux.HandleFunc("POST /ui/sessions/{id}/rerun", s.handleUIRerun)
 	mux.HandleFunc("GET /ui/secrets", s.handleUISecrets)
 	mux.HandleFunc("POST /ui/secrets", s.handleUISetSecret)
 	mux.HandleFunc("GET /ui/params", s.handleUIParams)
@@ -729,18 +730,49 @@ func (s *server) handleUISession(w http.ResponseWriter, r *http.Request) {
 	s.renderSession(w, sess)
 }
 
+// handleUIRerun starts the session's agent again with the same input and
+// moves the page to the new run. Errors come back as text for the run page
+// to show next to its Rerun button.
+func (s *server) handleUIRerun(w http.ResponseWriter, r *http.Request) {
+	old, ok := s.sessions.Get(r.PathValue("id"))
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+	sess, _, err := s.rerun(r.Context(), old)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprint(w, err.Error())
+		return
+	}
+	w.Header().Set("HX-Trigger", "refresh")
+	w.Header().Set("HX-Redirect", "/#runs/"+sess.ID())
+}
+
 func (s *server) renderSession(w http.ResponseWriter, sess *sessions.Session) {
 	logs, _ := sess.Logs(0)
 	info := sess.Status()
 	events := sessions.ParseEvents(logs)
 	s.render(w, "session.html", struct {
 		sessions.StatusInfo
+		Input     string
+		CanRerun  bool
 		Logs      string
 		Result    *sessions.Result
 		Artifacts []sessions.Artifact
 		Timeline  []timelineItem
 		Budgets   []budgetRow
-	}{info, sessions.StripEvents(logs), sess.Result(), sess.Artifacts(), timeline(info, events), budgets(info, events, logs)})
+	}{info, inputText(sess.Input()), sess.Input() != nil, sessions.StripEvents(logs), sess.Result(), sess.Artifacts(),
+		timeline(info, events), budgets(info, events, logs)})
+}
+
+// inputText shows a run's input, indented when it is JSON.
+func inputText(input []byte) string {
+	var v any
+	if json.Unmarshal(input, &v) == nil {
+		return prettyJSON(v)
+	}
+	return string(input)
 }
 
 // budgetRow is one of a run's limits with how much of it the run has used.
