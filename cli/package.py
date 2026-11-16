@@ -412,7 +412,10 @@ def api_request(server, method, path, body=None, timeout=30, raw=False):
                 msg = e.reason
         sys.exit(f"trefoil: {msg}")
     except urllib.error.URLError as e:
-        sys.exit(f"trefoil: cannot reach server at {server}: {e.reason}")
+        msg = f"trefoil: cannot reach server at {server}: {e.reason}"
+        if isinstance(e.reason, ConnectionRefusedError):
+            msg += "\nPerhaps you forgot to start the engine? Run `trefoil engine start`."
+        sys.exit(msg)
 
 
 def cmd_sync(args):
