@@ -109,6 +109,7 @@ trefoil params unset --name=repo
 
 trefoil jobs list [--agent=echo] [--status=running]
 trefoil jobs status JOB_ID [-f] [--logs]
+trefoil jobs rerun  JOB_ID [-d]
 ```
 
 When adding a command: put it under an existing domain (or add a new domain
@@ -176,6 +177,14 @@ A session keeps the input it was started with, params already filled in
 which also shows the input) starts a new session of the same agent with that
 exact input, against the current config and image; later param changes don't
 apply. Sessions saved before inputs were kept can't be rerun (409).
+
+## Rerunning build jobs
+
+`POST /jobs/{id}/rerun` (`trefoil jobs rerun`, or the Rerun button on a
+finished build job in the dashboard's details pane) builds the job's agent
+again as a new job, from the current config like any build, and answers
+with the new job (202). Rerunning a queued or running job, or one that isn't
+a build, is a 409; an agent no longer in the config is a 404.
 
 ## Run timeline events
 

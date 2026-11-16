@@ -31,6 +31,7 @@ Usage: trefoil <domain> <command> [args]
   trefoil secrets set --name=NAME
   trefoil jobs list [--agent=NAME] [--status=STATUS]
   trefoil jobs status ID [-f] [--logs]
+  trefoil jobs rerun ID [-d]
 """
 
 import argparse
@@ -478,6 +479,15 @@ def cmd_jobs_status(args):
         sys.stdout.write(job["logs"])
 
 
+def cmd_jobs_rerun(args):
+    job = api_request(args.server, "POST", f"/jobs/{quote(args.id)}/rerun", b"")
+    print(f"job {job['id']}: rebuilding {job['agent']} -> {job['image']} (rerun of {args.id})", file=sys.stderr)
+    if args.detach:
+        print(job["id"])
+        return
+    follow_job(args.server, job["id"])
+
+
 def cmd_jobs_list(args):
     rows = [(j["id"], j["kind"], j["agent"], j["status"], j["created_at"][:19].replace("T", " "))
             for j in api_request(args.server, "GET", "/jobs?" + urlencode(
@@ -867,6 +877,10 @@ def main():
     jobs_status.add_argument("-f", "--follow", action="store_true", help="stream logs until the job finishes")
     jobs_status.add_argument("--logs", action="store_true", help="print the logs so far")
     jobs_status.set_defaults(func=cmd_jobs_status)
+    jobs_rerun = jobs.add_parser("rerun", parents=[server], help="build a job's agent again from the current config")
+    jobs_rerun.add_argument("id", help="job id")
+    jobs_rerun.add_argument("-d", "--detach", action="store_true", help="print the new job id and return")
+    jobs_rerun.set_defaults(func=cmd_jobs_rerun)
 
     args = parser.parse_args()
     args.func(args)
