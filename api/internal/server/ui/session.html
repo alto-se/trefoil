@@ -3,6 +3,7 @@
     <a href="#runs" class="muted">← Runs</a>
     <h2>{{.Agent}} <span class="pill {{.Status}}">{{.Status}}</span></h2>
     <span class="muted">started {{ago .CreatedAt}} · {{if eq .Status "running"}}running for{{else}}took{{end}} {{dur .CreatedAt .FinishedAt}}</span>
+    {{if eq .Status "running"}}<button hx-post="/agents/{{.Agent}}/sessions/{{.ID}}/stop" hx-swap="none" hx-confirm="Stop this run? Its container is killed.">Stop</button>{{end}}
   </header>
   <dl>
     <dt>Session</dt><dd class="mono">{{.ID}}</dd>
@@ -54,6 +55,10 @@
         <h2>Output</h2>
         <pre class="flush">{{or .Result.Stdout "(empty)"}}</pre>
       </section>{{end}}
+      <section class="run-logs">
+        <h2 class="with-action">Logs <a href="/agents/{{.Agent}}/sessions/{{.ID}}/logs?download=1" download>Download</a></h2>
+        <pre class="flush logs">{{or .Logs "(no output yet)"}}</pre>
+      </section>
       {{if .Artifacts}}<section>
         <h2>Artifacts</h2>
         <ul class="artifacts">
@@ -62,8 +67,4 @@
       </section>{{end}}
     </div>
   </div>
-  <section class="run-logs">
-    <h2 class="with-action">Logs <a href="/agents/{{.Agent}}/sessions/{{.ID}}/logs?download=1" download>Download</a></h2>
-    <pre class="flush logs">{{or .Logs "(no output yet)"}}</pre>
-  </section>
 </div>

@@ -274,9 +274,10 @@ func (s *server) startRun(ctx context.Context, c *conf.Conf, agent *conf.Agent, 
 	// Limits come from the current config, so changing them needs no rebuild.
 	limits := c.AgentLimits(agent)
 	limitsJSON, _ := json.Marshal(limits)
-	// The run outlives the request; its timeout comes from the limits.
-	sess := s.sessions.Start(name, limits, func(sess *sessions.Session) (*sessions.Result, error) {
-		res, err := s.docker.Run(context.Background(), tag, input, build.RunOptions{
+	// The run outlives the request; its timeout comes from the limits, and
+	// its context ends early on a stop.
+	sess := s.sessions.Start(name, limits, func(ctx context.Context, sess *sessions.Session) (*sessions.Result, error) {
+		res, err := s.docker.Run(ctx, tag, input, build.RunOptions{
 			Env:       map[string]string{"TREFOIL_LIMITS": string(limitsJSON)},
 			Timeout:   time.Duration(limits.TimeoutSeconds * float64(time.Second)),
 			Logs:      sess,
@@ -309,6 +310,22 @@ func (s *server) handleSessionStatus(w http.ResponseWriter, r *http.Request) {
 	if sess, ok := s.session(w, r); ok {
 		writeJSON(w, http.StatusOK, sess.Status())
 	}
+}
+
+// handleSessionStop stops a running session; its container is killed and
+// the session finishes as failed with the error "stopped". A session that
+// already finished is a 409.
+func (s *server) handleSessionStop(w http.ResponseWriter, r *http.Request) {
+	sess, ok := s.session(w, r)
+	if !ok {
+		return
+	}
+	if !sess.Stop() {
+		writeError(w, http.StatusConflict, "session not running")
+		return
+	}
+	s.logger.Info("stopping session", "agent", sess.Agent(), "session", sess.ID())
+	writeJSON(w, http.StatusAccepted, sess.Status())
 }
 
 // handleSessionEvents returns the run's timeline events, parsed from the

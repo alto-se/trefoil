@@ -1,0 +1,41 @@
+# An agent that builds a feature in a GitHub repository and sees it through
+# CI: it clones the repo, makes the change, pushes a branch, opens a pull
+# request labelled with the input's `id` (a ticket key such as PROJ-123) and
+# waits for the checks. When a check fails it reads the log, fixes the code,
+# pushes again and waits again. Tests run in the repo's CI, not locally.
+#
+# The shared code:github brick's MCP server is read-only, so writing to
+# GitHub goes through the local `pulls` brick (REST API, same token). The
+# token needs Contents, Pull requests and Issues write access, plus Checks,
+# Commit statuses and Actions read access.
+agents:
+  - name: feature
+    bricks:
+      - code:github   # CloneRepo and the read-only GitHub MCP server
+      - core:os       # Read, Write, Bash
+      - pulls         # local: PushBranch, OpenPullRequest, WaitForChecks
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string, description: "GitHub repository, owner/name" }
+        id: { type: string, description: "Ticket id the pull request is labelled with, e.g. PROJ-123" }
+        task: { type: string, description: "The feature to build" }
+        base: { type: string, description: "Branch to open the pull request against; the default branch if empty" }
+      required: [repo, id, task]
+    prompts:
+      - source: !Ref file://prompt.md
+        role: system
+
+bricks:
+  pulls: !Ref file://bricks/pulls/config.yml
+
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 8000
+  limits:
+    max_turns: 60
+    # CI can take a while, and a failing run means another round of it.
+    timeout_seconds: 3600
+    max_cost_usd: 5.00

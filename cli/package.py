@@ -17,7 +17,7 @@ Usage: trefoil <domain> <command> [args]
   trefoil config sync [path/to/config.yml] [--server URL]
   trefoil agents list
   trefoil agents build --agent=NAME [-d] [--dockerfile]
-  trefoil agents context --agent=NAME [-o FILE]
+  trefoil agents get-bundle --agent=NAME [-o FILE]
   trefoil agents run --agent=NAME [TASK | --input=JSON|file://PATH] [-d]
   trefoil sessions status|logs|result --agent=NAME ID
   trefoil sessions artifacts --agent=NAME ID [-o DIR]
@@ -382,6 +382,11 @@ def cmd_sessions_result(args):
     print_result(args.server, args.agent, args.id)
 
 
+def cmd_sessions_stop(args):
+    api_request(args.server, "POST", session_path(args.agent, args.id, "stop"))
+    print(f"stopping session {args.id}; it finishes as failed with error \"stopped\"", file=sys.stderr)
+
+
 def cmd_sessions_artifacts(args):
     artifacts = api_request(args.server, "GET", session_path(args.agent, args.id, "artifacts"))["artifacts"]
     if args.output is None:
@@ -475,7 +480,7 @@ def main():
     agents_build.add_argument("--dockerfile", action="store_true", help="print the generated Dockerfile")
     agents_build.set_defaults(func=cmd_agents_build)
 
-    agents_context = agents.add_parser("context", parents=[server, agent],
+    agents_context = agents.add_parser("get-bundle", aliases=["context"], parents=[server, agent],
                                        help="download an agent's build context (Dockerfile and files) as a zip")
     agents_context.add_argument("-o", "--output", type=Path, metavar="FILE",
                                 help="where to save the zip (default: ./NAME-context.zip)")
@@ -493,6 +498,7 @@ def main():
     for name, func, help_text in (("status", cmd_sessions_status, "show a session's status"),
                                   ("logs", cmd_sessions_logs, "print a session's logs"),
                                   ("result", cmd_sessions_result, "print a finished session's answer"),
+                                  ("stop", cmd_sessions_stop, "stop a running session"),
                                   ("artifacts", cmd_sessions_artifacts, "list or download a session's artifacts")):
         sub = sessions.add_parser(name, parents=[server, agent], help=help_text)
         sub.add_argument("id", help="session id")

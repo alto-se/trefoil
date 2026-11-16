@@ -1,0 +1,52 @@
+name: "Pull requests"
+
+# Write access to GitHub over its REST API, for clones made by code:github's
+# CloneRepo (/workspace/repos/<owner>/<repo>). Uses the same GITHUB_TOKEN.
+tools:
+  - name: PushBranch
+    description: "Commits every change in the clone of a repo and pushes it to a branch (created from the current commit if new). Never pushes to the default branch."
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string, description: "Repository as owner/name, already cloned with CloneRepo" }
+        branch: { type: string, description: "Branch to push to, e.g. PROJ-123/add-csv-export" }
+        message: { type: string, description: "Commit message" }
+      required: [repo, branch, message]
+    command:
+      language: python
+      code:
+        content: !Ref file://tools.py
+        entry: PushBranch
+
+  - name: OpenPullRequest
+    description: "Opens a pull request from a pushed branch and adds a label to it (the label is created if missing). Returns the number and URL; if one is already open for the branch, returns that one."
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string, description: "Repository as owner/name" }
+        branch: { type: string, description: "Branch with the changes" }
+        title: { type: string }
+        body: { type: string, description: "Markdown description" }
+        label: { type: string, description: "Label to tag the pull request with, e.g. a ticket id" }
+        base: { type: string, description: "Target branch; the default branch if omitted" }
+      required: [repo, branch, title, body, label]
+    command:
+      language: python
+      code:
+        content: !Ref file://tools.py
+        entry: OpenPullRequest
+
+  - name: WaitForChecks
+    description: "Waits until every check run and commit status on a pull request's latest commit has finished, then reports each result with the end of the log of failed GitHub Actions jobs."
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string, description: "Repository as owner/name" }
+        number: { type: integer, description: "Pull request number" }
+        timeout_minutes: { type: integer, description: "How long to wait, default 20" }
+      required: [repo, number]
+    command:
+      language: python
+      code:
+        content: !Ref file://tools.py
+        entry: WaitForChecks

@@ -4,6 +4,7 @@
 package sessions
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -24,8 +25,8 @@ type Status string
 const (
 	Running   Status = "running"
 	Succeeded Status = "succeeded"
-	// Failed covers a non-zero exit, a timeout, a limit stop and errors
-	// starting the container; Result says which.
+	// Failed covers a non-zero exit, a timeout, a limit stop, a Stop and
+	// errors starting the container; Result and the error say which.
 	Failed Status = "failed"
 )
 
@@ -55,6 +56,9 @@ type Session struct {
 	// logFile is open while the run is going.
 	dir     string
 	logFile *os.File
+	// cancel ends the run's context; stopped records that Stop called it.
+	cancel  context.CancelFunc
+	stopped bool
 }
 
 // StatusInfo is a point-in-time view of a session, without logs or output.
@@ -98,6 +102,22 @@ func (s *Session) Status() StatusInfo {
 		info.FinishedAt = &t
 	}
 	return info
+}
+
+// Stop cancels a running session's context, which kills its container. It
+// reports false when the session isn't running. The session finishes as
+// failed with the error "stopped" once the run has wound down.
+func (s *Session) Stop() bool {
+	s.mu.Lock()
+	if s.status != Running || s.cancel == nil || s.stopped {
+		s.mu.Unlock()
+		return false
+	}
+	s.stopped = true
+	s.cancel()
+	s.mu.Unlock()
+	_, _ = s.Write([]byte("\n[trefoil] run stopped by request\n"))
+	return true
 }
 
 // Logs returns the logs from byte offset on, and the offset to ask for next.
@@ -270,10 +290,12 @@ func Open(dir string) (*Manager, error) {
 }
 
 // Start creates a session and runs fn in the background. fn writes logs to
-// the session; a returned error means the run couldn't happen at all.
-// limits are kept with the session so its budgets can be shown.
-func (m *Manager) Start(agent string, limits conf.Limits, fn func(s *Session) (*Result, error)) *Session {
-	s := &Session{id: newID(), agent: agent, limits: limits, status: Running, createdAt: time.Now(), dir: m.dir}
+// the session and should end the run when ctx is done (see Stop); a returned
+// error means the run couldn't happen at all. limits are kept with the
+// session so its budgets can be shown.
+func (m *Manager) Start(agent string, limits conf.Limits, fn func(ctx context.Context, s *Session) (*Result, error)) *Session {
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Session{id: newID(), agent: agent, limits: limits, status: Running, createdAt: time.Now(), dir: m.dir, cancel: cancel}
 	if m.dir != "" {
 		s.logFile, _ = os.OpenFile(filepath.Join(m.dir, s.id+".log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	}
@@ -283,11 +305,14 @@ func (m *Manager) Start(agent string, limits conf.Limits, fn func(s *Session) (*
 	m.mu.Unlock()
 
 	go func() {
-		res, err := fn(s)
+		res, err := fn(ctx, s)
+		cancel()
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		s.finishedAt, s.result = time.Now(), res
 		switch {
+		case s.stopped:
+			s.status, s.err = Failed, "stopped"
 		case err != nil:
 			s.status, s.err = Failed, err.Error()
 		case res.TimedOut:
