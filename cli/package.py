@@ -13,6 +13,7 @@ directory of the file that references them.
 
 Usage: trefoil <domain> <command> [args]
 
+  trefoil init [DIR] [--example=NAME]
   trefoil config package path/to/config.yml [-o bundle.json]
   trefoil config sync [path/to/config.yml] [--server URL]
   trefoil agents list
@@ -41,6 +42,7 @@ from pathlib import Path
 import yaml
 
 DEFAULT_SERVER = "http://localhost:8080"
+EXAMPLES_API = "https://api.github.com/repos/alto-se/trefoil/contents/examples"
 
 
 class Ref:
@@ -141,6 +143,39 @@ def cmd_package(args):
         args.output.write_text(out + "\n")
     else:
         print(out)
+
+
+def example_files(url, prefix=""):
+    """Yields (relative path, download URL) for every file in an example folder on GitHub."""
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        entries = json.loads(resp.read())
+    for e in entries:
+        if e["type"] == "dir":
+            yield from example_files(e["url"], prefix + e["name"] + "/")
+        elif e["type"] == "file":
+            yield prefix + e["name"], e["download_url"]
+
+
+def cmd_init(args):
+    dest = args.dir or Path(args.example)
+    if dest.exists() and (not dest.is_dir() or any(dest.iterdir())):
+        sys.exit(f"trefoil: {dest} already exists and is not empty")
+    try:
+        files = list(example_files(f"{EXAMPLES_API}/{quote(args.example)}?ref=main"))
+        for rel, url in files:
+            with urllib.request.urlopen(url, timeout=30) as resp:
+                data = resp.read()
+            path = dest / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            sys.exit(f"trefoil: no example named {args.example}")
+        sys.exit(f"trefoil: fetching example {args.example}: {e}")
+    except urllib.error.URLError as e:
+        sys.exit(f"trefoil: cannot fetch example {args.example}: {e.reason}")
+    print(f"created {dest} from example {args.example} ({len(files)} files)")
+    print(f"next: cd {dest} && trefoil config sync")
 
 
 def api_request(server, method, path, body=None, timeout=30, raw=False):
@@ -468,6 +503,12 @@ def main():
     def domain(name, help_text):
         return domains.add_parser(name, help=help_text).add_subparsers(
             dest="command", metavar="<command>", required=True)
+
+    init = domains.add_parser("init", help="scaffold a project from an example config")
+    init.add_argument("dir", type=Path, nargs="?", help="directory to create (default: the example's name)")
+    init.add_argument("--example", default="echo", metavar="NAME",
+                      help="example under examples/ in github.com/alto-se/trefoil (default: echo)")
+    init.set_defaults(func=cmd_init)
 
     config = domain("config", "package and upload agent configs")
     package = config.add_parser("package", help=__doc__.splitlines()[0])

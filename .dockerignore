@@ -1,0 +1,6 @@
+*
+!api/
+!bricks/
+api/api
+**/__pycache__
+**/.DS_Store

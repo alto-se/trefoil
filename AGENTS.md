@@ -41,6 +41,16 @@ types (`chore:`, `docs:`, ...) release nothing. The release commit updates
 the version by hand. Install with `pip install trefoil-cli` (the command is
 `trefoil`).
 
+## API image
+
+`Dockerfile` builds the API server with the shared bricks baked in
+(`BRICKS_DIR=/trefoil/bricks`, `DATA_DIR=/data`). It calls the docker CLI to
+build and run agents, so mount the host socket:
+`docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock -v trefoil-data:/data ghcr.io/alto-se/trefoil-api`.
+`.github/workflows/publish-api.yml` runs `go test` and builds it on PRs, and
+on pushes to `main` publishes `ghcr.io/alto-se/trefoil-api:latest` and
+`:sha-<short sha>`.
+
 ## CLI shape
 
 The CLI is always `trefoil <domain> <command> [args]`. Named things are passed
