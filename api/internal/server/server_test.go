@@ -451,7 +451,7 @@ func TestRerunJob(t *testing.T) {
 	}
 
 	// A rerun builds the agent again from the config as it is now.
-	if rec := do(h, http.MethodPost, "/conf", `{"modules":{"os":{}},"defaults":{"modules":["os"]},"agents":[{"name":"a"}]}`); rec.Code != http.StatusCreated {
+	if rec := do(h, http.MethodPost, "/conf", `{"modules":{"os":{"layers":[{"title":"t","script":"echo hi"}]}},"agents":[{"name":"a","modules":["os"]}]}`); rec.Code != http.StatusCreated {
 		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
 	}
 	second := buildAndWait(t, h, "/jobs/"+first["id"].(string)+"/rerun")
