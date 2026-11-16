@@ -28,6 +28,7 @@ Usage: trefoil <domain> <command> [args]
 import argparse
 import base64
 import getpass
+import importlib.metadata
 import json
 import os
 import sys
@@ -446,8 +447,16 @@ def print_table(header, rows, empty):
         print("  ".join(cell.ljust(w) for cell, w in zip(row, widths)).rstrip())
 
 
+def cli_version():
+    try:
+        return importlib.metadata.version("trefoil-cli")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
 def main():
     parser = argparse.ArgumentParser(prog="trefoil", description="trefoil <domain> <command> [args]")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {cli_version()}")
     domains = parser.add_subparsers(dest="domain", metavar="<domain>", required=True)
 
     server = argparse.ArgumentParser(add_help=False)

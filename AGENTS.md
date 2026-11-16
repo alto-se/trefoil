@@ -49,6 +49,7 @@ as flags (`--agent=NAME`), not positionals. Every server-talking command takes
 after the command.
 
 ```sh
+trefoil --version
 trefoil config package path/to/config.yml [-o bundle.json]
 trefoil config sync [path/to/config.yml]
 
