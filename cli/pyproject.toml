@@ -1,6 +1,6 @@
 [project]
 name = "trefoil-cli"
-version = "1.1.0"
+version = "1.1.1"
 description = "CLI for the trefoil agent server"
 requires-python = ">=3.10"
 dependencies = ["pyyaml>=6"]
