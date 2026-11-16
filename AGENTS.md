@@ -69,7 +69,7 @@ after the command.
 trefoil --version
 trefoil init [DIR] [--example=NAME]  # copy examples/NAME from GitHub (default: starter)
 trefoil update                     # reinstall the latest trefoil-cli via pip (or uv)
-trefoil engine start [--settings=backend.yml] [--port=8080] [-d]  # docker run the API image
+trefoil engine start [--settings=backend.yml] [--port=8080] [--foreground]  # docker run -d the API image
 trefoil engine stop [--name=trefoil-api]
 trefoil config package path/to/config.yml [-o bundle.json]
 trefoil config sync [path/to/config.yml]

@@ -15,7 +15,7 @@ Usage: trefoil <domain> <command> [args]
 
   trefoil init [DIR] [--example=NAME]
   trefoil update
-  trefoil engine start [--settings=backend.yml] [--port=8080] [-d]
+  trefoil engine start [--settings=backend.yml] [--port=8080] [--foreground]
   trefoil engine stop
   trefoil config package path/to/config.yml [-o bundle.json]
   trefoil config sync [path/to/config.yml] [--server URL]
@@ -224,11 +224,15 @@ def cmd_engine_start(args):
                 sys.exit(f"trefoil: env_file {host} (from {args.settings}) not found")
             target = env_file if os.path.isabs(env_file) else os.path.normpath(f"/trefoil/settings/{env_file}")
             cmd += ["-v", f"{host}:{target}:ro"]
-    if args.detach:
+    if not args.foreground:
         cmd.append("-d")
     cmd.append(args.image)
     print(f"trefoil: {' '.join(cmd)}", file=sys.stderr)
-    sys.exit(subprocess.run(cmd).returncode)
+    code = subprocess.run(cmd, stdout=subprocess.DEVNULL if not args.foreground else None).returncode
+    if code == 0 and not args.foreground:
+        print(f"trefoil: engine running on http://localhost:{args.port} "
+              f"(logs: docker logs -f {args.name}, stop: trefoil engine stop)", file=sys.stderr)
+    sys.exit(code)
 
 
 def cmd_engine_stop(args):
@@ -585,7 +589,8 @@ def main():
     engine_start.add_argument("--name", default="trefoil-api", help="container name (default: trefoil-api)")
     engine_start.add_argument("--volume", default="trefoil-data",
                                help="docker volume (or host path) for the data dir (default: trefoil-data)")
-    engine_start.add_argument("-d", "--detach", action="store_true", help="run in the background")
+    engine_start.add_argument("--foreground", action="store_true",
+                              help="run attached instead of in the background")
     engine_start.set_defaults(func=cmd_engine_start)
     engine_stop = engine.add_parser("stop", help="stop the running API server container")
     engine_stop.add_argument("--name", default="trefoil-api", help="container name (default: trefoil-api)")
