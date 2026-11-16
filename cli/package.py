@@ -15,7 +15,8 @@ Usage: trefoil <domain> <command> [args]
 
   trefoil init [DIR] [--example=NAME]
   trefoil update
-  trefoil start-backend [--settings=backend.yml] [--port=8080] [-d]
+  trefoil engine start [--settings=backend.yml] [--port=8080] [-d]
+  trefoil engine stop
   trefoil config package path/to/config.yml [-o bundle.json]
   trefoil config sync [path/to/config.yml] [--server URL]
   trefoil agents list
@@ -199,7 +200,7 @@ def cmd_update(args):
     sys.exit(subprocess.run(cmd).returncode)
 
 
-def cmd_start_backend(args):
+def cmd_engine_start(args):
     if not shutil.which("docker"):
         sys.exit("trefoil: docker is not installed or not on PATH")
     cmd = ["docker", "run", "--rm", "--name", args.name, "-p", f"{args.port}:8080",
@@ -227,6 +228,15 @@ def cmd_start_backend(args):
     cmd.append(args.image)
     print(f"trefoil: {' '.join(cmd)}", file=sys.stderr)
     sys.exit(subprocess.run(cmd).returncode)
+
+
+def cmd_engine_stop(args):
+    if not shutil.which("docker"):
+        sys.exit("trefoil: docker is not installed or not on PATH")
+    # started with --rm, so stopping also removes the container
+    cmd = ["docker", "stop", args.name]
+    print(f"trefoil: {' '.join(cmd)}", file=sys.stderr)
+    sys.exit(subprocess.run(cmd, stdout=subprocess.DEVNULL).returncode)
 
 
 def api_request(server, method, path, body=None, timeout=30, raw=False):
@@ -564,17 +574,21 @@ def main():
     update = domains.add_parser("update", help="reinstall the latest trefoil-cli from PyPI")
     update.set_defaults(func=cmd_update)
 
-    start_backend = domains.add_parser("start-backend", help="run the trefoil API server image locally with docker")
-    start_backend.add_argument("--settings", type=Path, metavar="FILE",
+    engine = domain("engine", "run the trefoil API server locally with docker")
+    engine_start = engine.add_parser("start", help="run the trefoil API server image")
+    engine_start.add_argument("--settings", type=Path, metavar="FILE",
                                help="backend settings file (backend.yml) to mount into the container")
-    start_backend.add_argument("--port", type=int, default=8080, help="host port to publish (default: 8080)")
-    start_backend.add_argument("--image", default="ghcr.io/alto-se/trefoil-api:latest",
+    engine_start.add_argument("--port", type=int, default=8080, help="host port to publish (default: 8080)")
+    engine_start.add_argument("--image", default="ghcr.io/alto-se/trefoil-api:latest",
                                help="API image (default: ghcr.io/alto-se/trefoil-api:latest)")
-    start_backend.add_argument("--name", default="trefoil-api", help="container name (default: trefoil-api)")
-    start_backend.add_argument("--volume", default="trefoil-data",
+    engine_start.add_argument("--name", default="trefoil-api", help="container name (default: trefoil-api)")
+    engine_start.add_argument("--volume", default="trefoil-data",
                                help="docker volume (or host path) for the data dir (default: trefoil-data)")
-    start_backend.add_argument("-d", "--detach", action="store_true", help="run in the background")
-    start_backend.set_defaults(func=cmd_start_backend)
+    engine_start.add_argument("-d", "--detach", action="store_true", help="run in the background")
+    engine_start.set_defaults(func=cmd_engine_start)
+    engine_stop = engine.add_parser("stop", help="stop the running API server container")
+    engine_stop.add_argument("--name", default="trefoil-api", help="container name (default: trefoil-api)")
+    engine_stop.set_defaults(func=cmd_engine_stop)
 
     config = domain("config", "package and upload agent configs")
     package = config.add_parser("package", help=__doc__.splitlines()[0])
