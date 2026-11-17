@@ -79,6 +79,7 @@ func New(logger *slog.Logger, st store.Store, v *schema.Validator, d build.Docke
 	// /agents/build/{id} alias; separate patterns would conflict in ServeMux.
 	mux.HandleFunc("POST /agents/{a}/{b}", s.handleAgentAction)
 	mux.HandleFunc("GET /agents/{name}/context", s.handleAgentContext)
+	mux.HandleFunc("GET /export", s.handleExport)
 	mux.HandleFunc("GET /agents/{name}/sessions/{id}/status", s.handleSessionStatus)
 	mux.HandleFunc("POST /agents/{name}/sessions/{id}/stop", s.handleSessionStop)
 	mux.HandleFunc("POST /agents/{name}/sessions/{id}/rerun", s.handleSessionRerun)

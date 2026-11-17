@@ -740,3 +740,70 @@ func TestAgentContextZip(t *testing.T) {
 		t.Fatalf("zip files = %v", slices.Collect(maps.Keys(files)))
 	}
 }
+
+func TestExport(t *testing.T) {
+	h := newTestHandler(t)
+	conf := `{"params":{"type":"object","properties":{"repo":{"type":"string"}},"required":["repo"]},` +
+		`"defaults":{"limits":{"max_turns":3}},` +
+		`"modules":{"gh":{"secrets":{"github_token":{"required":true}},"mcps":[{"name":"github","url":"https://mcp.example","credentials":{"Authorization":"Bearer ${GITHUB_TOKEN}"}}],"layers":[{"title":"t","script":"echo hi"}]}},` +
+		`"agents":[{"name":"Web.App","modules":["gh"],"input_schema":{"type":"object","properties":{"repo":{"type":"string"}}}},{"name":"plain"}]}`
+	if rec := do(h, http.MethodPost, "/conf", conf); rec.Code != http.StatusCreated {
+		t.Fatalf("POST /conf: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := do(h, http.MethodPost, "/secret/github_token", `{"value":"s3cret"}`); rec.Code != http.StatusCreated {
+		t.Fatalf("POST /secret: status = %d", rec.Code)
+	}
+
+	rec := do(h, http.MethodGet, "/export", "")
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Disposition") != `attachment; filename="trefoil-environment.zip"` {
+		t.Fatalf("status = %d, headers = %v, body = %s", rec.Code, rec.Header(), rec.Body)
+	}
+	if strings.Contains(rec.Body.String(), "s3cret") {
+		t.Fatal("export contains a secret value")
+	}
+	zr, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{}
+	for _, f := range zr.File {
+		rc, _ := f.Open()
+		data, _ := io.ReadAll(rc)
+		rc.Close()
+		files[f.Name] = string(data)
+	}
+	for _, name := range []string{"agents/web.app/Dockerfile", "agents/web.app/agent.json", "agents/plain/Dockerfile"} {
+		if files[name] == "" {
+			t.Fatalf("missing %s in %v", name, slices.Collect(maps.Keys(files)))
+		}
+	}
+	var env environment
+	if err := json.Unmarshal([]byte(files["environment.json"]), &env); err != nil {
+		t.Fatalf("environment.json: %v\n%s", err, files["environment.json"])
+	}
+	if env.Provider != "anthropic" || len(env.LLMEnv) == 0 || env.LLMEnv[0].Name != "ANTHROPIC_API_KEY" {
+		t.Errorf("provider = %q, llm_env = %+v", env.Provider, env.LLMEnv)
+	}
+	if len(env.Secrets) != 1 || env.Secrets[0].Name != "GITHUB_TOKEN" || !env.Secrets[0].Required {
+		t.Errorf("secrets = %+v", env.Secrets)
+	}
+	if len(env.Params) != 1 || env.Params[0].Name != "repo" || !env.Params[0].Required {
+		t.Errorf("params = %+v", env.Params)
+	}
+	if len(env.Agents) != 2 {
+		t.Fatalf("agents = %+v", env.Agents)
+	}
+	a := env.Agents[0]
+	if a.Context != "agents/web.app" || a.Image != "trefoil-agent-web.app:latest" ||
+		!slices.Equal(a.Secrets, []string{"GITHUB_TOKEN"}) || !slices.Equal(a.Params, []string{"repo"}) ||
+		len(a.MCPs) != 1 || a.MCPs[0].URL != "https://mcp.example" || a.Env["TREFOIL_LIMITS"] != `{"max_turns":3}` {
+		t.Errorf("agent = %+v", a)
+	}
+	if a.Build != "docker build -t trefoil-agent-web.app:latest agents/web.app" ||
+		!strings.Contains(a.Run, "-e ANTHROPIC_API_KEY") || !strings.Contains(a.Run, "-e GITHUB_TOKEN") {
+		t.Errorf("build = %q, run = %q", a.Build, a.Run)
+	}
+	if p := env.Agents[1]; len(p.Secrets) != 0 || strings.Contains(p.Run, "GITHUB_TOKEN") {
+		t.Errorf("plain agent = %+v", p)
+	}
+}

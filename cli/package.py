@@ -20,6 +20,7 @@ Usage: trefoil <domain> <command> [args]
   trefoil engine stop
   trefoil config package path/to/config.yml [-o bundle.json]
   trefoil config sync [path/to/config.yml] [--server URL]
+  trefoil config export [-o FILE]
   trefoil agents list
   trefoil agents build --agent=NAME [-d] [--dockerfile]
   trefoil agents get-dockerfile --agent=NAME [-o FILE]
@@ -47,6 +48,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from urllib.parse import quote, urlencode
 from pathlib import Path
 
@@ -428,6 +430,22 @@ def cmd_sync(args):
         print(f"  generated {f}")
 
 
+def cmd_export(args):
+    data = api_request(args.server, "GET", "/export", timeout=300, raw=True)
+    output = args.output or Path("trefoil-environment.zip")
+    output.write_bytes(data)
+    with zipfile.ZipFile(output) as zf:
+        env = json.loads(zf.read("environment.json"))
+    print(f"exported {len(env['agents'])} agents ({env['provider']})", file=sys.stderr)
+    needed = [v["name"] for v in env["llm_env"] if v["required"]]
+    needed += [s["name"] for s in env["secrets"] if s["required"]]
+    if needed:
+        print(f"  required env: {', '.join(needed)}", file=sys.stderr)
+    if env["params"]:
+        print(f"  params: {', '.join(p['name'] for p in env['params'])}", file=sys.stderr)
+    print(output)
+
+
 def follow_job(server, job_id, interval=1.0):
     """Streams a job's logs to stderr until it finishes; exits 1 if it failed."""
     printed = 0
@@ -800,6 +818,12 @@ def main():
     sync.add_argument("config", type=Path, nargs="?", default=Path("config.yml"),
                       help="path to config.yml (default: ./config.yml)")
     sync.set_defaults(func=cmd_sync)
+    export = config.add_parser("export", parents=[server],
+                               help="download every agent's build context plus environment.json "
+                                    "(needed secrets, params, LLM variables) as a zip")
+    export.add_argument("-o", "--output", type=Path, metavar="FILE",
+                        help="where to save the zip (default: ./trefoil-environment.zip)")
+    export.set_defaults(func=cmd_export)
 
     agents = domain("agents", "work with agents on the server")
     agents_list = agents.add_parser("list", parents=[server], help="list agents in the uploaded config")

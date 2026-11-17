@@ -87,6 +87,7 @@ trefoil engine start --setup        # ask for the backend again (saved in ~/.tre
 trefoil engine stop [--name=trefoil-api]
 trefoil config package path/to/config.yml [-o bundle.json]
 trefoil config sync [path/to/config.yml]
+trefoil config export [-o trefoil-environment.zip]   # every agent's build context + environment.json
 
 trefoil agents list
 trefoil agents build --agent=echo [-d] [--dockerfile]
@@ -160,6 +161,21 @@ Dockerfile and every file it copies under one `<agent>/` folder, so
 `unzip` then `docker build <agent>` builds the same image outside the
 server. `trefoil agents get-dockerfile --agent=NAME [-o FILE]` saves it, and the
 dashboard's agent page links to it.
+
+## Environment export
+
+`GET /export` (`trefoil config export [-o FILE]`) zips the whole config as
+`trefoil-environment.zip`: each agent's build context under
+`agents/<agent>/` (as `GET /agents/{name}/context` composes it) and
+`environment.json`, which describes what running them needs: `provider`,
+`model`, `aws_region`, `llm_env` (the LLM backend's variables, required or
+not), `secrets` (names, `required`, agents; never values), `params` (as
+`GET /params`, with values), and per agent its `context`, `image`,
+`modules`, `limits`, `input_schema`, `outputs`, the `secrets` and `params`
+it uses, `mcps` (without credentials), `env` (`TREFOIL_LIMITS`) and ready
+`build`/`run` docker commands (the run reads input on stdin and mounts
+`./artifacts` at `/trefoil/artifacts`). The CLI prints the required env
+names to stderr.
 
 ## Stopping runs
 
