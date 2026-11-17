@@ -17,3 +17,8 @@ def test_clone_public_repo(tools):
     path = tools.CloneRepo(repo="octocat/Hello-World")
     assert path == "/workspace/repos/octocat/Hello-World", path
     assert os.path.isdir(os.path.join(path, ".git"))
+
+
+def test_create_issue_rejects_bad_repo(tools):
+    result = tools.CreateIssue(repo="not a repo", title="t", body="b")
+    assert result.startswith("Error: repo must look like owner/name"), result

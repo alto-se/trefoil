@@ -1,0 +1,81 @@
+# Exports a trefoil config as an environment folder (every agent's build
+# context plus environment.json, as `trefoil config export --unzip`) by
+# syncing it to a throwaway API container. No LLM credentials are needed.
+#
+#   - uses: alto-se/trefoil/actions/export-environment@v0.12.0
+#     with:
+#       config: trefoil/config.yml
+#       output: trefoil-environment
+#       params: |
+#         repo=owner/name
+name: trefoil export environment
+description: Export a trefoil config as a folder of agent build contexts plus environment.json
+
+inputs:
+  config:
+    description: path to the config to export
+    default: trefoil/config.yml
+  output:
+    description: folder to unpack the export into (an earlier export there is replaced)
+    default: trefoil-environment
+  params:
+    description: param values to set before exporting, one name=value per line
+    default: ""
+  image:
+    description: API image (default ghcr.io/alto-se/trefoil-api at this action's VERSION)
+    default: ""
+  port:
+    description: host port for the temporary API server
+    default: "8080"
+
+outputs:
+  path:
+    description: the folder holding the export
+    value: ${{ steps.export.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v6
+
+    - name: Install the trefoil CLI
+      shell: bash
+      run: uv tool install "$GITHUB_ACTION_PATH/../../cli"
+
+    - name: Start the API server
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        PORT: ${{ inputs.port }}
+      run: |
+        image=${IMAGE:-ghcr.io/alto-se/trefoil-api:$(cat "$GITHUB_ACTION_PATH/../../VERSION")}
+        docker run -d --rm --name trefoil-export -p "$PORT:8080" "$image" >/dev/null
+        for _ in $(seq 60); do
+          curl -fs "http://localhost:$PORT/healthz" >/dev/null && exit 0
+          sleep 1
+        done
+        docker logs trefoil-export
+        echo "::error::trefoil API server did not start"
+        exit 1
+
+    - name: Export
+      id: export
+      shell: bash
+      env:
+        CONFIG: ${{ inputs.config }}
+        OUTPUT: ${{ inputs.output }}
+        PARAMS: ${{ inputs.params }}
+        TREFOIL_SERVER: http://localhost:${{ inputs.port }}
+      run: |
+        trefoil config sync "$CONFIG"
+        while IFS= read -r line; do
+          [ -z "${line// }" ] && continue
+          trefoil params set --name="${line%%=*}" "${line#*=}"
+        done <<< "$PARAMS"
+        trefoil config export --unzip "$OUTPUT"
+        echo "path=$OUTPUT" >> "$GITHUB_OUTPUT"
+
+    - name: Stop the API server
+      if: always()
+      shell: bash
+      run: docker stop trefoil-export >/dev/null 2>&1 || true

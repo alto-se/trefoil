@@ -16,7 +16,8 @@ Read `modules/code/trefoil/skills/trefoil-agents/SKILL.md` before writing an
 agent or module (Claude Code loads it through the `.claude/skills/` symlink;
 trefoil agents get it from the `code:trefoil` module): prefer shared modules (`core:os`, `code:github`, ...) over new tools,
 keep modules generic (a capability, not one agent's part), put programs in their own module instead of heredocs in a layer script, and
-lay configs out as `trefoil/agents/<name>/` and `trefoil/modules/<name>/`.
+lay configs out as a global `trefoil/config.yml` plus one `trefoil/<agent>/` folder per agent
+(`agent.yml`, `prompt.md`, `modules/`).
 
 ## Common tasks
 
@@ -87,7 +88,7 @@ trefoil engine start --setup        # ask for the backend again (saved in ~/.tre
 trefoil engine stop [--name=trefoil-api]
 trefoil config package path/to/config.yml [-o bundle.json]
 trefoil config sync [path/to/config.yml]
-trefoil config export [-o trefoil-environment.zip]   # every agent's build context + environment.json
+trefoil config export [-o trefoil-environment.zip | --unzip [DIR]]   # every agent's build context + environment.json
 
 trefoil agents list
 trefoil agents build --agent=echo [-d] [--dockerfile]
@@ -175,7 +176,19 @@ not), `secrets` (names, `required`, agents; never values), `params` (as
 it uses, `mcps` (without credentials), `env` (`TREFOIL_LIMITS`) and ready
 `build`/`run` docker commands (the run reads input on stdin and mounts
 `./artifacts` at `/trefoil/artifacts`). The CLI prints the required env
-names to stderr.
+names to stderr; `--unzip [DIR]` (default `./trefoil-environment`) unpacks
+it instead, replacing an earlier export in DIR (its `agents/` folder) and
+refusing any other non-empty folder.
+
+The `actions/export-environment` GitHub Action does the same in a workflow
+without a running engine: it installs the CLI from the action's checkout,
+starts the API image (`ghcr.io/alto-se/trefoil-api` at the action's
+`VERSION`, or `image:`) without LLM credentials, syncs `config:` (default
+`trefoil/config.yml`), sets `params:` (`name=value` lines), unzips the
+export into `output:` (default `trefoil-environment`, also the `path`
+output) and stops the container. Use it as
+`alto-se/trefoil/actions/export-environment@v<version>`; commit the folder or
+upload it with `actions/upload-artifact`.
 
 ## Stopping runs
 

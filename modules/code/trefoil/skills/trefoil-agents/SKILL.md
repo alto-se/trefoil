@@ -70,7 +70,7 @@ grows. Current shared modules:
 | `core:os` | `Read`, `Write`, `Bash` — almost every agent wants this |
 | `core:trefoil` | `SaveArtifact` — files the user downloads after the run |
 | `core:chromium` | headless Chromium: `OpenPage`, `PrintPdf`, browser skill |
-| `code:github` | GitHub MCP (repos/issues/PRs, read-only), `CloneRepo`; needs `github_token` |
+| `code:github` | GitHub MCP (repos/issues/PRs, read-only), `CloneRepo`, `CreateIssue`; needs `github_token` |
 | `code:python` | venv at `/opt/venv`, `RunPython` (with pip packages) |
 | `code:node` | Node.js LTS, `RunNode` |
 | `code:go` | Go toolchain, `RunGo` |
@@ -106,8 +106,8 @@ can list it unchanged:
 
 An agent-specific module is OK only when the capability truly can't be
 reused (a one-off parser for one system's format). Even then keep it local
-(`trefoil/modules/<name>/`), and promote it to a shared module once a second
-agent needs it.
+(in the agent's own folder, `trefoil/<agent>/modules/<name>/`), and promote it
+to a shared module once a second agent needs it.
 
 ## Bad pattern: an app hidden in a layer script
 
@@ -135,37 +135,71 @@ list it:
 
 ## Folder layout
 
-A project that keeps its trefoil config in its own repo uses:
+A project that keeps its trefoil config in its own repo has one global config
+at the top and one folder per agent holding everything that agent needs:
 
 ```
 trefoil/
-  config.yml                 # params, defaults, agents: !include, modules: !include
-  agents/<name>/config.yml   # one agent per folder
-  agents/<name>/prompt.md
-  modules/<name>/config.yml   # local modules, laid out like shared ones
-  modules/<name>/tools.py
-  modules/<name>/skills/<skill>.zip
+  config.yml                         # global: params, defaults, agents: !include, modules: !include
+  <agent>/agent.yml                  # the agent entry: name, modules, input_schema, prompts, limits
+  <agent>/prompt.md
+  <agent>/input.json                 # a sample input for `trefoil agents run`
+  <agent>/modules/<name>/config.yml  # local modules this agent uses, laid out like shared ones
+  <agent>/modules/<name>/tools.py
+  <agent>/modules/<name>/skills/<skill>.zip
 ```
 
 ```yaml
 # trefoil/config.yml
+params:
+  type: object
+  properties:
+    repo: { type: string, description: "GitHub repository, owner/name" }
 agents:
-  - !include file://agents/error-triage/config.yml
+  - !include file://log-issue-finder/agent.yml
 modules:
-  log-triage: !include file://modules/log-triage/config.yml
+  log-parser: !include file://log-issue-finder/modules/log-parser/config.yml
+defaults:
+  provider: bedrock
+  aws_region: eu-west-1
+  model: "claude-sonnet-4-6"
+  max_tokens: 8000
+```
+
+```yaml
+# trefoil/log-issue-finder/agent.yml: one agent entry, not a list
+name: log-issue-finder
+modules: [cloud:aws, code:github, core:os, core:trefoil, log-parser]
+input_schema:
+  type: object
+  properties:
+    repo: { type: string }
+  required: [repo]
+prompts:
+  - source: !include file://prompt.md
+    role: system
+limits: { max_turns: 60, timeout_seconds: 1800, max_cost_usd: 3.00 }
 ```
 
 Refs resolve against the referencing file's folder, so an agent's
-`prompt.md` is `!include file://prompt.md`.
+`prompt.md` is `!include file://prompt.md`. Local modules form one map for
+the whole config, so a module kept in an agent's folder still gets a line
+under the global `modules:`. Run everything from `trefoil/`:
+`trefoil config sync config.yml`, then
+`trefoil agents run --agent=<agent> --input=file://<agent>/input.json`.
+
+To add an agent: create `trefoil/<agent>/agent.yml` and `prompt.md`, and add
+`- !include file://<agent>/agent.yml` under `agents:`.
 
 ## Where things go
 
-- Agent only for this config → local module in `trefoil/modules/<name>/`
-  (`modules: {name: !include file://modules/name/config.yml}`), see `examples/local`.
+- Only one agent uses it → local module in `trefoil/<agent>/modules/<name>/`
+  (`modules: {name: !include file://<agent>/modules/name/config.yml}` in the
+  global config), see `examples/local`.
 - Reusable across configs → shared module `modules/<ns>/<name>/config.yml`
   (+ `tools.py`, `skills/*.zip`, `tests.py`), referenced as `ns:name`.
-- Values the user sets once (a repo, a project id) → top-level `params`, not
-  hard-coded in prompts. See `examples/repo-ops`.
+- Values the user sets once (a repo, a project id) → top-level `params` in the
+  global config, not hard-coded in prompts. See `examples/repo-ops`.
 - Credentials → module `secrets:` (`trefoil secrets set --name=...`), never in
   config or prompts.
 

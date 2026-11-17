@@ -1,5 +1,6 @@
-# GitHub access for an agent: the GitHub MCP server plus a tool to clone
-# repositories. The token comes from TREFOIL_SECRET_GITHUB_TOKEN on the
+# GitHub access for an agent: the GitHub MCP server (read-only), a tool to
+# clone repositories and a tool to create issues (REST API; the token needs
+# Issues write access for it). The token comes from TREFOIL_SECRET_GITHUB_TOKEN on the
 # server and reaches the container as GITHUB_TOKEN.
 secrets:
   github_token:
@@ -35,3 +36,19 @@ tools:
       code:
         content: !include file://tools.py
         entry: CloneRepo
+
+  - name: CreateIssue
+    description: "Creates an issue in a GitHub repository and adds labels to it (labels are created if missing). Returns the issue number and URL."
+    input_schema:
+      type: object
+      properties:
+        repo: { type: string, description: "Repository as owner/name" }
+        title: { type: string }
+        body: { type: string, description: "Markdown description" }
+        labels: { type: array, items: { type: string }, description: "Labels to add, e.g. [\"bug\"]" }
+      required: [repo, title, body]
+    command:
+      language: python
+      code:
+        content: !include file://tools.py
+        entry: CreateIssue
