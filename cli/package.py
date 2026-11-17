@@ -20,7 +20,7 @@ Usage: trefoil <domain> <command> [args]
   trefoil engine stop
   trefoil config package path/to/config.yml [-o bundle.json]
   trefoil config sync [path/to/config.yml] [--server URL]
-  trefoil config export [-o FILE | --unzip [DIR]]
+  trefoil config export [-o DIR] [--zip [-o FILE]]
   trefoil agents list
   trefoil agents build --agent=NAME [-d] [--dockerfile]
   trefoil agents get-dockerfile --agent=NAME [-o FILE]
@@ -435,17 +435,17 @@ def cmd_export(args):
     data = api_request(args.server, "GET", "/export", timeout=300, raw=True)
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         env = json.loads(zf.read("environment.json"))
-        if args.unzip:
-            output = args.unzip
+        if args.zip:
+            output = args.output or Path("trefoil-environment.zip")
+            output.write_bytes(data)
+        else:
+            output = args.output or Path("trefoil-environment")
             if (output / "environment.json").is_file():
                 # A previous export: replace it so removed agents don't linger.
                 shutil.rmtree(output / "agents", ignore_errors=True)
-            elif output.exists() and any(output.iterdir()):
+            elif output.exists() and (not output.is_dir() or any(output.iterdir())):
                 sys.exit(f"trefoil: {output} is not empty and holds no earlier export")
             zf.extractall(output)
-        else:
-            output = args.output or Path("trefoil-environment.zip")
-            output.write_bytes(data)
     print(f"exported {len(env['agents'])} agents ({env['provider']})", file=sys.stderr)
     needed = [v["name"] for v in env["llm_env"] if v["required"]]
     needed += [s["name"] for s in env["secrets"] if s["required"]]
@@ -831,12 +831,10 @@ def main():
     export = config.add_parser("export", parents=[server],
                                help="download every agent's build context plus environment.json "
                                     "(needed secrets, params, LLM variables) as a zip")
-    export_out = export.add_mutually_exclusive_group()
-    export_out.add_argument("-o", "--output", type=Path, metavar="FILE",
-                            help="where to save the zip (default: ./trefoil-environment.zip)")
-    export_out.add_argument("--unzip", type=Path, nargs="?", const=Path("trefoil-environment"), metavar="DIR",
-                            help="unpack into DIR instead of saving the zip (default: ./trefoil-environment); "
-                                 "an earlier export there is replaced")
+    export.add_argument("-o", "--output", type=Path, metavar="PATH",
+                        help="folder to unpack into (default: ./trefoil-environment; an earlier export "
+                             "there is replaced), or the zip file with --zip (default: ./trefoil-environment.zip)")
+    export.add_argument("--zip", action="store_true", help="save the zip instead of unpacking it")
     export.set_defaults(func=cmd_export)
 
     agents = domain("agents", "work with agents on the server")

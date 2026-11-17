@@ -88,7 +88,7 @@ trefoil engine start --setup        # ask for the backend again (saved in ~/.tre
 trefoil engine stop [--name=trefoil-api]
 trefoil config package path/to/config.yml [-o bundle.json]
 trefoil config sync [path/to/config.yml]
-trefoil config export [-o trefoil-environment.zip | --unzip [DIR]]   # every agent's build context + environment.json
+trefoil config export [-o DIR] [--zip]   # every agent's build context + environment.json, unpacked
 
 trefoil agents list
 trefoil agents build --agent=echo [-d] [--dockerfile]
@@ -165,7 +165,7 @@ dashboard's agent page links to it.
 
 ## Environment export
 
-`GET /export` (`trefoil config export [-o FILE]`) zips the whole config as
+`GET /export` (`trefoil config export`) zips the whole config as
 `trefoil-environment.zip`: each agent's build context under
 `agents/<agent>/` (as `GET /agents/{name}/context` composes it) and
 `environment.json`, which describes what running them needs: `provider`,
@@ -176,9 +176,10 @@ not), `secrets` (names, `required`, agents; never values), `params` (as
 it uses, `mcps` (without credentials), `env` (`TREFOIL_LIMITS`) and ready
 `build`/`run` docker commands (the run reads input on stdin and mounts
 `./artifacts` at `/trefoil/artifacts`). The CLI prints the required env
-names to stderr; `--unzip [DIR]` (default `./trefoil-environment`) unpacks
-it instead, replacing an earlier export in DIR (its `agents/` folder) and
-refusing any other non-empty folder.
+names to stderr and by default unpacks it into `-o DIR` (default
+`./trefoil-environment`), replacing an earlier export there (its `agents/`
+folder) and refusing any other non-empty folder; `--zip` saves the zip
+instead (`-o FILE`, default `./trefoil-environment.zip`).
 
 The `actions/export-environment` GitHub Action does the same in a workflow
 without a running engine: it installs the CLI from the action's checkout,
